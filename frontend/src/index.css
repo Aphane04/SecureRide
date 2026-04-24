@@ -1,0 +1,53 @@
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* Tailwind Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0a] text-white antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Custom Underline Input Style (Specific to your Design Reference) */
+  input[type="text"], 
+  input[type="email"], 
+  input[type="password"], 
+  input[type="tel"] {
+    @apply bg-transparent border-b border-gray-800 focus:border-green-500 outline-none transition-all duration-300;
+  }
+
+  /* Custom Scrollbar for the dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-black;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-800 rounded-full hover:bg-green-800;
+  }
+
+  /* Text Selection color */
+  ::selection {
+    @apply bg-green-500/30 text-green-200;
+  }
+}
+
+/* Custom Utility for the glowing SOS button */
+.btn-sos {
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.4);
+  transition: all 0.3s ease;
+}
+.btn-sos:hover {
+  box-shadow: 0 0 35px rgba(220, 38, 38, 0.6);
+  transform: scale(1.05);
+}
+
+/* Glassmorphism for Dashboard Cards */
+.glass-panel {
+  @apply bg-[#121212]/80 backdrop-blur-md border border-white/5;
+}
