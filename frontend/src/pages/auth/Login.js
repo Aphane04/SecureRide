@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import bgImage from '../../assets/Gemini_Generated_Image_wuenigwuenigwuen.png'; // Ensure you have this image in your assets folder
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -26,9 +26,12 @@ const Login = () => {
       <div className="max-w-5xl w-full flex bg-black rounded-3xl overflow-hidden shadow-2xl border border-gray-900">
         
         {/* Left Side: Brand & Visuals (Hidden on small screens) */}
-        <div className="hidden md:flex w-1/2 p-12 flex-col justify-between relative bg-cover bg-center"
-             style={{ backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.8)), url('https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?ixlib=rb-4.0.3')" }}>
-          
+        <div
+  className="hidden md:flex w-1/2 p-12 flex-col justify-between relative bg-cover bg-center"
+  style={{
+    backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.2)), url(${bgImage})`
+  }}
+>
           <div>
             <span className="text-green-500 font-bold text-xl tracking-wider">SECURE RIDE</span>
           </div>

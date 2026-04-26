@@ -67,7 +67,7 @@ def create_access_token(data: dict):
 # --- API ENDPOINTS ---
 
 # 1. Registration Logic
-@app.post("/register", response_model=schemas.UserOut)
+@app.post("/auth/register", response_model=schemas.UserOut)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # Check if user exists
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -94,7 +94,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         full_name=user.full_name,
         id_number=user.id_number,
         phone=user.phone,
-        address=user.address,
+        physical_address=user.address,
+        ethnicity=user.ethnicity,
         dob=user.dob,
         gender=user.gender
     )
@@ -104,7 +105,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 # 2. Login Logic
-@app.post("/login")
+@app.post("/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.password):
@@ -123,7 +124,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     }
 
 # 3. Update Verification (After Face Scan)
-@app.post("/verify-liveness/{user_id}")
+@app.post("/auth/verify-liveness/{user_id}")
 def verify_liveness(user_id: int, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
@@ -134,7 +135,7 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
     return {"message": "User verified successfully"}
 
 # 4. AI Emergency Monitoring Endpoint
-@app.post("/trips/{trip_id}/emergency")
+@app.post("/auth/trips/{trip_id}/emergency")
 def trigger_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
     print(f"!!! EMERGENCY ALERT FOR TRIP {trip_id} !!!")
     print(f"Transcript: {data.transcript}")
@@ -149,7 +150,7 @@ def trigger_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = 
     return {"status": "Alert Received", "action": "Emergency services notified"}
 
 # 5. Fetch Dashboard Data (Role Based)
-@app.get("/users/me", response_model=schemas.UserProfileOut)
+@app.get("/auth/users/me", response_model=schemas.UserProfileOut)
 def get_current_user_profile(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

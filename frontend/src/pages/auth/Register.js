@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Ensure you have installed axios: npm install axios
+import { authAPI } from '../../utils/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -20,17 +20,18 @@ const Register = () => {
 
     try {
       // 2. API Call to your FastAPI Backend
-      const response = await axios.post('http://127.0.0.1:8000/register', {
-        email: formData.email,
-        password: formData.password,
-        full_name: `${formData.firstName} ${formData.surname}`,
-        id_number: formData.idNumber,
-        phone: formData.contact,
-        address: formData.address,
-        dob: formData.dob,
-        gender: formData.gender,
-        role: formData.accountType // Maps 'accountType' to 'role' in backend
-      });
+      const response = await authAPI.register({
+    email: formData.email,
+    password: formData.password,
+    full_name: `${formData.firstName} ${formData.surname}`,
+    id_number: formData.idNumber,
+    phone: formData.contact,
+    address: formData.address,
+    dob: formData.dob,
+    gender: formData.gender,
+    role: formData.accountType,
+    ethnicity: formData.ethnicity  // <-- Add this!
+});
 
       console.log("Registration Successful:", response.data);
 
