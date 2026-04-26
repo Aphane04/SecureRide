@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import bgImage from '../../assets/Gemini_Generated_Image_wuenigwuenigwuen.png'; // Ensure you have this image in your assets folder
+import bgImage from '../../assets/streets.png'; // Ensure you have this image in your assets folder
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -33,7 +33,7 @@ const Login = () => {
   }}
 >
           <div>
-            <span className="text-green-500 font-bold text-xl tracking-wider">SECURE RIDE</span>
+            <span className="text-green-100 font-bold text-xl tracking-wider">SECURE RIDE</span>
           </div>
 
           <div className="mb-10">
@@ -43,7 +43,7 @@ const Login = () => {
             </p>
           </div>
 
-          <div className="text-xs text-gray-600">
+          <div className="text-xs text-gray-400">
             presented by <span className="text-white font-semibold">SecureRide Tech</span>
           </div>
         </div>
