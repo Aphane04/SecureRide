@@ -89,11 +89,11 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # Hash password and create User row
     hashed_pass = get_password_hash(user.password)
     new_user = models.User(
-        email=user.email,
-        
-        role=user.role,
-        is_verified=False
-    )
+    email=user.email,
+    password=hashed_pass,
+    role=user.role,
+    is_verified=False
+)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)

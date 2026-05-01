@@ -35,3 +35,7 @@ class UserProfileOut(BaseModel):
 
 class EmergencyAlert(BaseModel):
     transcript: str
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
