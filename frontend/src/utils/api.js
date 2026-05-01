@@ -17,15 +17,18 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+}, (error) => Promise.reject(error));
 
 // API Methods
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
-  verifyLiveness: (data) => api.post('/auth/verify-liveness', data),
+  recordConsent: (userId) => api.post(`/auth/consent/${userId}`),
+  uploadId: (userId, formData) =>
+    api.post(`/auth/upload-id/${userId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  verifyLiveness: (userId) => api.post(`/auth/verify-liveness/${userId}`),
 };
 
 export const tripAPI = {

@@ -1,117 +1,152 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import * as faceapi from 'face-api.js';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { UserCheck, RefreshCw } from 'lucide-react';
 import { authAPI } from '../../utils/api';
 
-const IDUpload = () => {
+const FaceScan = () => {
+  const videoRef = useRef();
   const navigate = useNavigate();
   const location = useLocation();
   const userId = location.state?.userId;
 
-  const [docType, setDocType] = useState('ID');
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("Initializing AI...");
+  const [step, setStep] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Revoke the object URL when component unmounts or preview changes
+  const intervalRef = useRef(null);
+  const steps = ["Look Straight", "Turn Head Left", "Turn Head Right"];
+
   useEffect(() => {
+    const loadModels = async () => {
+      const MODEL_URL = '/models';
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      ]);
+      startVideo();
+    };
+    loadModels();
+
     return () => {
-      if (preview) {
-        URL.revokeObjectURL(preview);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [preview]);
+  }, []);
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (!selected) return;
-    setFile(selected);
-    if (selected.type.startsWith('image/')) {
-      // Revoke previous URL before creating a new one
-      if (preview) URL.revokeObjectURL(preview);
-      setPreview(URL.createObjectURL(selected));
-    } else {
-      if (preview) URL.revokeObjectURL(preview);
-      setPreview(null);
-    }
+  const startVideo = () => {
+    navigator.mediaDevices.getUserMedia({ video: {} })
+      .then((stream) => {
+        videoRef.current.srcObject = stream;
+        setLoading(false);
+        setStatus(steps[0]);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError('Camera access denied. Please allow camera access and refresh.');
+      });
   };
 
-  const handleNext = async () => {
-    if (!file) {
-      setError('Please select a document to upload.');
-      return;
-    }
-    setError('');
-    setLoading(true);
+  const handleVideoPlay = () => {
+    intervalRef.current = setInterval(async () => {
+      if (!videoRef.current) return;
+
+      const detections = await faceapi.detectSingleFace(
+        videoRef.current,
+        new faceapi.TinyFaceDetectorOptions()
+      ).withFaceLandmarks();
+
+      if (detections) {
+        const landmarks = detections.landmarks;
+        const nose = landmarks.getNose();
+        const jaw = landmarks.getJawOutline();
+
+        const noseX = nose[0].x;
+        const jawWidth = jaw[16].x - jaw[0].x;
+        const relativePos = (noseX - jaw[0].x) / jawWidth;
+
+        setStep((prev) => {
+          if (prev === 0 && relativePos > 0.4 && relativePos < 0.6) {
+            setStatus(steps[1]);
+            return 1;
+          } else if (prev === 1 && relativePos < 0.3) {
+            setStatus(steps[2]);
+            return 2;
+          } else if (prev === 2 && relativePos > 0.7) {
+            setStatus("Verification Successful");
+            clearInterval(intervalRef.current);
+            if (videoRef.current?.srcObject) {
+              videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
+            }
+            completeVerification();
+            return 3;
+          }
+          return prev;
+        });
+      }
+    }, 500);
+  };
+
+  const completeVerification = async () => {
     try {
       if (userId) {
-        await authAPI.uploadId(userId, file, docType);
+        await authAPI.verifyLiveness(userId);
       }
-      navigate('/verify/face-scan', { state: { userId } });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Upload failed. Please try again.');
+      console.error('Liveness API call failed:', err);
     } finally {
-      setLoading(false);
+      setTimeout(() => navigate('/login'), 2000);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-white">
-      <div className="max-w-md w-full bg-[#121212] p-8 rounded-xl text-center shadow-xl border border-gray-900">
-        <h2 className="text-2xl font-bold mb-2">Identity Document</h2>
-        <p className="text-gray-400 mb-8">Please upload a clear photo of your document</p>
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-white font-sans">
+      <div className="mb-10 text-center">
+        <h2 className="text-3xl font-black tracking-tighter mb-2">Live Identity Verification</h2>
+        <p className="text-gray-500 text-sm italic uppercase tracking-widest">Ensuring you are a real person</p>
+      </div>
 
-        <select
-          className="w-full bg-black p-3 mb-6 rounded border border-gray-800"
-          value={docType}
-          onChange={(e) => setDocType(e.target.value)}
-        >
-          <option value="ID">National ID Card</option>
-          <option value="Passport">International Passport</option>
-        </select>
+      {error && (
+        <div className="mb-6 p-3 bg-red-900/30 border border-red-700 rounded text-red-400 text-sm max-w-sm text-center">
+          {error}
+        </div>
+      )}
 
-        <div className="border-2 border-dashed border-gray-700 p-10 rounded-lg mb-4 hover:border-green-500 transition cursor-pointer">
-          <input
-            type="file"
-            className="hidden"
-            id="fileUp"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
-            onChange={handleFileChange}
+      <div className="relative w-80 h-80 lg:w-[450px] lg:h-[450px]">
+        <div className={`absolute inset-0 rounded-full border-4 border-dashed transition-all duration-700 ${step === 3 ? 'border-[#008751] animate-none' : 'border-gray-800 animate-spin-slow'}`} />
+
+        <div className="absolute inset-4 rounded-full overflow-hidden border-2 border-white/10 shadow-[0_0_50px_rgba(0,135,81,0.2)]">
+          <video
+            ref={videoRef}
+            onPlay={handleVideoPlay}
+            autoPlay
+            muted
+            className="w-full h-full object-cover grayscale brightness-110"
           />
-          <label htmlFor="fileUp" className="cursor-pointer">
-            {preview ? (
-              <img
-                src={preview}
-                alt="Document preview"
-                className="mx-auto max-h-40 rounded"
-              />
-            ) : (
-              <>
-                <div className="text-4xl mb-2">📷</div>
-                <p className="text-sm text-gray-500">
-                  {file ? file.name : `Tap to upload ${docType} photo`}
-                </p>
-              </>
-            )}
-          </label>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded text-red-400 text-sm">
-            {error}
-          </div>
-        )}
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-[#121212] px-8 py-3 rounded-full border border-gray-800 shadow-2xl flex items-center gap-3">
+          {step === 3
+            ? <UserCheck className="text-[#008751]" />
+            : <RefreshCw className="animate-spin text-gray-500" size={18} />
+          }
+          <span className={`font-bold text-sm ${step === 3 ? 'text-[#008751]' : 'text-white'}`}>{status}</span>
+        </div>
+      </div>
 
-        <button
-          onClick={handleNext}
-          disabled={loading}
-          className="w-full bg-[#008751] py-3 rounded font-bold hover:bg-green-700 disabled:opacity-60 transition"
-        >
-          {loading ? 'Uploading...' : 'Next: Facial Verification'}
-        </button>
+      <div className="mt-20 grid grid-cols-3 gap-8">
+        {steps.map((s, i) => (
+          <div key={i} className="flex flex-col items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${step >= i ? 'bg-[#008751]' : 'bg-gray-800'}`} />
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${step >= i ? 'text-white' : 'text-gray-700'}`}>{s}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
-export default IDUpload;
+export default FaceScan;

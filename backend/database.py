@@ -8,19 +8,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get the database URL from .env
-# Example format: mysql://user:password@host:port/defaultdb
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+AIVEN_CA_PATH = os.getenv("AIVEN_CA_PATH")
 
 if not SQLALCHEMY_DATABASE_URL:
     raise ValueError("DATABASE_URL not found in environment variables. Check your .env file.")
 
+# SSL config for Aiven (if provided)
+connect_args = {}
+if AIVEN_CA_PATH:
+    connect_args["ssl"] = {"ca": AIVEN_CA_PATH}
+
 # Configure the Engine
-# pool_recycle: Closes connections after 1 hour to prevent timeout on Aiven
-# pool_pre_ping: Checks if the connection is still alive before using it
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_recycle=3600,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    connect_args=connect_args
 )
 
 # Create a session factory
@@ -39,5 +43,5 @@ def get_db():
 
 # Function to create all tables (Run this once on startup)
 def init_db():
-    import models # Imported here to avoid circular imports
+    import models  # Imported here to avoid circular imports
     Base.metadata.create_all(bind=engine)

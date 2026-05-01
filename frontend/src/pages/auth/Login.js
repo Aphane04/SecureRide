@@ -1,37 +1,40 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import bgImage from '../../assets/streets.png'; // Ensure you have this image in your assets folder
+import bgImage from '../../assets/streets.png';
+import { authAPI } from '../../utils/api';
+
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    try {
+      const response = await authAPI.login({ email, password });
+      const { access_token, user } = response.data;
 
-    // Mock Login Logic: In a real app, you would verify this via your FastAPI backend
-    // and extract the user's role from the JWT token.
-    if (email.includes('admin')) {
-      navigate('/dashboard/admin');
-    } else if (email.includes('driver')) {
-      navigate('/dashboard/driver');
-    } else {
-      navigate('/dashboard/passenger');
+      localStorage.setItem('token', access_token);
+
+      if (user.role === 'Admin') navigate('/dashboard/admin');
+      else if (user.role === 'Driver') navigate('/dashboard/driver');
+      else navigate('/dashboard/passenger');
+    } catch (error) {
+      alert(error.response?.data?.detail || 'Login failed. Please try again.');
     }
   };
 
   return (
     <div className="min-h-screen bg-[#060b07] flex items-center justify-center p-4">
-      {/* Main Container */}
       <div className="max-w-5xl w-full flex bg-black rounded-3xl overflow-hidden shadow-2xl border border-gray-900">
         
-        {/* Left Side: Brand & Visuals (Hidden on small screens) */}
+        {/* Left Side */}
         <div
-  className="hidden md:flex w-1/2 p-12 flex-col justify-between relative bg-cover bg-center"
-  style={{
-    backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.2)), url(${bgImage})`
-  }}
->
+          className="hidden md:flex w-1/2 p-12 flex-col justify-between relative bg-cover bg-center"
+          style={{
+            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.2)), url(${bgImage})`
+          }}
+        >
           <div>
             <span className="text-green-100 font-bold text-xl tracking-wider">SECURE RIDE</span>
           </div>
@@ -48,15 +51,12 @@ const Login = () => {
           </div>
         </div>
         
-        {/* Right Side: Login Form */}
+        {/* Right Side */}
         <div className="w-full md:w-1/2 p-12 flex">
-          
           <div className="flex-1 flex flex-col justify-center">
             <h2 className="text-3xl font-bold text-white mb-8">Sign in</h2>
             
             <form onSubmit={handleSubmit} className="space-y-6">
-              
-              {/* Email Input */}
               <div className="relative border-b border-gray-700 focus-within:border-green-500 transition">
                 <label className="text-xs text-gray-500 absolute -top-3.5 left-0">Your Email</label>
                 <input 
@@ -69,7 +69,6 @@ const Login = () => {
                 />
               </div>
 
-              {/* Password Input */}
               <div className="relative border-b border-gray-700 focus-within:border-green-500 transition">
                 <label className="text-xs text-gray-500 absolute -top-3.5 left-0">Password</label>
                 <input 
@@ -82,7 +81,6 @@ const Login = () => {
                 />
               </div>
 
-              {/* Submit Button */}
               <button 
                 type="submit" 
                 className="w-full bg-[#008751] hover:bg-[#007043] text-white py-3.5 rounded-md font-semibold transition mt-8 text-sm"
@@ -105,31 +103,23 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Social Media Column (Like in your image) */}
+          {/* Social Media Column */}
           <div className="ml-8 hidden lg:flex flex-col items-center justify-center">
             <div className="h-20 w-px bg-gray-800 mb-4"></div>
             <span className="text-gray-500 text-xs mb-4">OR</span>
             <div className="flex flex-col gap-4">
-              
-              {/* Facebook */}
               <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
                 <span className="text-black font-bold text-sm">f</span>
               </div>
-              
-              {/* Twitter/X */}
               <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
                 <span className="text-black font-bold text-xs">𝕏</span>
               </div>
-              
-              {/* Google */}
               <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
                 <span className="text-black font-bold text-sm">G</span>
               </div>
-
             </div>
             <div className="h-20 w-px bg-gray-800 mt-4"></div>
           </div>
-
         </div>
       </div>
     </div>
