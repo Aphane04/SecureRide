@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import bgImage from '../../assets/streets.png';
 import { authAPI } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -14,7 +16,7 @@ const Login = () => {
       const response = await authAPI.login({ email, password });
       const { access_token, user } = response.data;
 
-      localStorage.setItem('token', access_token);
+      login(user, access_token);
 
       if (user.role === 'Admin') navigate('/dashboard/admin');
       else if (user.role === 'Driver') navigate('/dashboard/driver');
