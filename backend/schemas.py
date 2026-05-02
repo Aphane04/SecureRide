@@ -1,16 +1,16 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime
 
 class UserCreate(BaseModel):
     email: EmailStr
-    
     full_name: str
     id_number: str
     phone: str
     address: str
     dob: str
     gender: str
-    role: str # Passenger, Driver, Admin
+    role: str
     ethnicity: Optional[str] = None
     password: str
 
@@ -19,6 +19,7 @@ class UserCreate(BaseModel):
         if len(v.encode('utf-8')) > 72:
             raise ValueError('Password cannot be longer than 72 bytes')
         return v
+
 class UserOut(BaseModel):
     id: int
     email: str
@@ -31,7 +32,21 @@ class UserProfileOut(BaseModel):
     email: str
     role: str
     full_name: str
+    phone: Optional[str]
+    address: Optional[str]
+    dob: Optional[str]
+    gender: Optional[str]
+    id_number: Optional[str]
     is_verified: bool
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    id_number: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 class EmergencyAlert(BaseModel):
     transcript: str
@@ -39,3 +54,46 @@ class EmergencyAlert(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+class EmergencyContactCreate(BaseModel):
+    name: str
+    phone: str
+    relationship_type: Optional[str] = None
+
+class EmergencyContactOut(BaseModel):
+    id: int
+    name: str
+    phone: str
+    relationship_type: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class TripEstimateRequest(BaseModel):
+    pickup_location: str
+    destination: str
+    distance_km: float
+    duration_minutes: float
+
+class TripEstimateResponse(BaseModel):
+    estimated_fare: float
+    payment_method: str
+
+class TripCreate(BaseModel):
+    pickup_location: str
+    destination: str
+    distance_km: float
+    duration_minutes: float
+    fare: float
+
+class TripOut(BaseModel):
+    id: int
+    pickup_location: str
+    destination: str
+    status: str
+    start_time: datetime
+    distance_km: float
+    duration_minutes: float
+    fare: float
+    payment_method: str
+    class Config:
+        from_attributes = True

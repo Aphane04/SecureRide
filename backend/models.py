@@ -8,11 +8,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False) # Admin, Passenger, Driver
+    role = Column(String(20), nullable=False)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationships
     profile = relationship("Profile", back_populates="user", uselist=False)
     emergency_contacts = relationship("EmergencyContact", back_populates="user")
 
@@ -55,6 +54,7 @@ class EmergencyContact(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String(100))
     phone = Column(String(20))
+    relationship_type = Column(String(50))
     user = relationship("User", back_populates="emergency_contacts")
 
 class Trip(Base):
@@ -64,14 +64,18 @@ class Trip(Base):
     driver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     pickup_location = Column(String(255))
     destination = Column(String(255))
-    status = Column(String(50), default="Searching") # Searching, Active, Completed, Emergency
+    distance_km = Column(Float, default=0.0)
+    duration_minutes = Column(Float, default=0.0)
+    fare = Column(Float, default=0.0)
+    payment_method = Column(String(20), default="Cash")
+    status = Column(String(50), default="Searching")
     start_time = Column(DateTime(timezone=True), server_default=func.now())
-    
+
 class AiSafetyLog(Base):
     __tablename__ = "ai_safety_logs"
     id = Column(Integer, primary_key=True, index=True)
     trip_id = Column(Integer, ForeignKey("trips.id"))
-    transcript = Column(Text) # Stores what the AI heard (e.g. "Help")
+    transcript = Column(Text)
     detected_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Admin(Base):
