@@ -97,3 +97,32 @@ class TripOut(BaseModel):
     payment_method: str
     class Config:
         from_attributes = True
+
+# --- Admin Schemas ---
+class AdminOverviewOut(BaseModel):
+    drivers: int
+    passengers: int
+    active_trips: int
+    safety_alerts: int
+
+class AdminTripOut(BaseModel):
+    id: int
+    passenger_email: str
+    pickup_location: str
+    destination: str
+    fare: float
+    status: str
+    start_time: datetime
+
+class AdminUserOut(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: str
+    is_verified: bool
+
+class AdminAlertOut(BaseModel):
+    id: int
+    trip_id: int
+    transcript: str
+    detected_at: datetime

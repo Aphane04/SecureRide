@@ -72,6 +72,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+def ensure_admin(user: models.User):
+    if user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+# --- Auth ---
 @app.post("/auth/register", response_model=schemas.UserOut)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -143,6 +148,16 @@ def get_current_user_profile(user: models.User = Depends(get_current_user), db: 
         "is_verified": user.is_verified
     }
 
+@app.post("/auth/consent/{user_id}")
+def record_consent(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_verified = True
+    db.commit()
+    return {"message": "Consent recorded"}
+
+# --- Trips ---
 @app.post("/trips/estimate", response_model=schemas.TripEstimateResponse)
 def estimate_trip(data: schemas.TripEstimateRequest, user: models.User = Depends(get_current_user)):
     if user.role != "Passenger":
@@ -178,6 +193,7 @@ def trip_history(user: models.User = Depends(get_current_user), db: Session = De
         raise HTTPException(status_code=403, detail="Only passengers can view trip history.")
     return db.query(models.Trip).filter(models.Trip.passenger_id == user.id).order_by(models.Trip.start_time.desc()).all()
 
+# --- Contacts ---
 @app.post("/contacts", response_model=schemas.EmergencyContactOut)
 def add_contact(contact: schemas.EmergencyContactCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     new_contact = models.EmergencyContact(
@@ -221,3 +237,87 @@ def delete_contact(contact_id: int, user: models.User = Depends(get_current_user
     db.delete(existing)
     db.commit()
     return {"message": "Contact deleted"}
+
+# --- Admin Endpoints ---
+@app.get("/admin/overview", response_model=schemas.AdminOverviewOut)
+def admin_overview(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    drivers = db.query(models.User).filter(models.User.role == "Driver").count()
+    passengers = db.query(models.User).filter(models.User.role == "Passenger").count()
+    active_trips = db.query(models.Trip).filter(models.Trip.status != "Completed").count()
+    safety_alerts = db.query(models.AiSafetyLog).count()
+    return {
+        "drivers": drivers,
+        "passengers": passengers,
+        "active_trips": active_trips,
+        "safety_alerts": safety_alerts
+    }
+
+@app.get("/admin/trips", response_model=List[schemas.AdminTripOut])
+def admin_trips(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    rows = (
+        db.query(models.Trip, models.User.email)
+        .join(models.User, models.Trip.passenger_id == models.User.id)
+        .order_by(models.Trip.start_time.desc())
+        .limit(50)
+        .all()
+    )
+    return [
+        {
+            "id": trip.id,
+            "passenger_email": email,
+            "pickup_location": trip.pickup_location,
+            "destination": trip.destination,
+            "fare": trip.fare,
+            "status": trip.status,
+            "start_time": trip.start_time,
+        }
+        for trip, email in rows
+    ]
+
+@app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
+def admin_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    rows = (
+        db.query(models.User, models.Profile)
+        .join(models.Profile, models.User.id == models.Profile.user_id)
+        .filter(models.User.role == "Driver")
+        .all()
+    )
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "full_name": p.full_name,
+            "role": u.role,
+            "is_verified": u.is_verified
+        }
+        for u, p in rows
+    ]
+
+@app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
+def admin_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    rows = (
+        db.query(models.User, models.Profile)
+        .join(models.Profile, models.User.id == models.Profile.user_id)
+        .filter(models.User.role == "Passenger")
+        .all()
+    )
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "full_name": p.full_name,
+            "role": u.role,
+            "is_verified": u.is_verified
+        }
+        for u, p in rows
+    ]
+
+@app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
+def admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    rows = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).limit(50).all()
+    return rows

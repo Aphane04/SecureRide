@@ -17,6 +17,11 @@ import PassengerContacts from './pages/dashboard/PassengerContacts';
 import PassengerAccount from './pages/dashboard/PassengerAccount';
 
 import DriverDash from './pages/dashboard/DriverDash';
+import DriverOverview from './pages/dashboard/DriverOverview';
+import DriverHistory from './pages/dashboard/DriverHistory';
+import DriverContacts from './pages/dashboard/DriverContacts';
+import DriverAccount from './pages/dashboard/DriverAccount';
+
 import AdminDash from './pages/dashboard/AdminDash';
 
 function App() {
@@ -43,8 +48,15 @@ function App() {
         </Route>
 
         <Route path="/dashboard/driver" element={
-          <ProtectedRoute allowedRoles={['Driver']}><Layout><DriverDash /></Layout></ProtectedRoute>
-        } />
+          <ProtectedRoute allowedRoles={['Driver']}>
+            <Layout><DriverDash /></Layout>
+          </ProtectedRoute>
+        }>
+          <Route index element={<DriverOverview />} />
+          <Route path="history" element={<DriverHistory />} />
+          <Route path="contacts" element={<DriverContacts />} />
+          <Route path="account" element={<DriverAccount />} />
+        </Route>
 
         <Route path="/dashboard/admin" element={
           <ProtectedRoute allowedRoles={['Admin']}><Layout><AdminDash /></Layout></ProtectedRoute>
