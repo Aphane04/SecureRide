@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import React, { useEffect, useState } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-google-maps/api';
 import { Car, CheckCircle, Camera, List, Power, ArrowRight, Settings } from 'lucide-react';
-import { vehicleAPI } from '../../utils/api';
+import { tripAPI, vehicleAPI } from '../../utils/api';
 
 const DriverOverview = () => {
   const { isLoaded } = useJsApiLoader({
@@ -14,7 +14,62 @@ const DriverOverview = () => {
   const [vehiclePhoto, setVehiclePhoto] = useState(null);
   const [uploadError, setUploadError] = useState('');
 
-  if (!isLoaded) return null;
+  const [rideRequests, setRideRequests] = useState([]);
+  const [activeTrip, setActiveTrip] = useState(null);
+  const [directions, setDirections] = useState(null);
+
+  useEffect(() => {
+    tripAPI.getActiveTrip().then((res) => setActiveTrip(res.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setRideRequests([]);
+      return;
+    }
+
+    const loadRequests = async () => {
+      try {
+        const res = await tripAPI.getRideRequests();
+        setRideRequests(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadRequests();
+    const timer = setInterval(loadRequests, 5000);
+    return () => clearInterval(timer);
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (!activeTrip || !window.google) {
+      setDirections(null);
+      return;
+    }
+
+    const service = new window.google.maps.DirectionsService();
+    service.route(
+      {
+        origin: activeTrip.pickup_location,
+        destination: activeTrip.destination,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === 'OK') setDirections(result);
+      }
+    );
+  }, [activeTrip]);
+
+  const acceptRide = async (tripId) => {
+    try {
+      const res = await tripAPI.acceptRide(tripId);
+      setActiveTrip(res.data);
+      setRideRequests((prev) => prev.filter((t) => t.id !== tripId));
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to accept ride.');
+    }
+  };
 
   const submitVehicle = async () => {
     try {
@@ -34,6 +89,8 @@ const DriverOverview = () => {
     }
   };
 
+  if (!isLoaded) return null;
+
   return (
     <div className="relative h-[calc(100vh-64px)]">
       <GoogleMap
@@ -42,8 +99,14 @@ const DriverOverview = () => {
         mapContainerStyle={{ width: '100%', height: '100%' }}
         options={{ disableDefaultUI: true }}
       >
-        <Marker position={{ lat: -26.2041, lng: 28.0473 }} />
+        {directions ? <DirectionsRenderer directions={directions} /> : <Marker position={{ lat: -26.2041, lng: 28.0473 }} />}
       </GoogleMap>
+
+      {activeTrip && (
+        <div className="absolute top-24 left-6 bg-black/70 border border-green-500 px-4 py-2 rounded-xl text-xs font-bold text-green-400 z-10">
+          Active Trip: {activeTrip.pickup_location} → {activeTrip.destination}
+        </div>
+      )}
 
       <div className="absolute top-6 left-6 flex items-center gap-4 z-10">
         <button
@@ -71,27 +134,38 @@ const DriverOverview = () => {
         <div className="bg-[#121212]/95 backdrop-blur-2xl p-8 rounded-[40px] border border-gray-800 shadow-2xl">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-black text-white flex items-center gap-2"><List size={18}/> Ride Requests</h3>
-            <span className="text-[10px] font-bold text-gray-500 uppercase bg-gray-900 px-3 py-1 rounded-full">3 Nearby</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase bg-gray-900 px-3 py-1 rounded-full">
+              {rideRequests.length} Nearby
+            </span>
           </div>
 
           {!isOnline ? (
             <div className="py-12 text-center border-2 border-dashed border-gray-800 rounded-3xl">
               <p className="text-gray-600 text-sm font-bold italic tracking-wide">Connect to see live passenger requests</p>
             </div>
+          ) : activeTrip ? (
+            <div className="text-green-400 text-sm font-bold">Active trip in progress.</div>
+          ) : rideRequests.length === 0 ? (
+            <div className="text-gray-600 text-sm font-bold">No requests yet.</div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-black p-6 rounded-3xl border border-green-900/10 hover:border-[#008751] transition-all">
-                <div className="flex justify-between items-start mb-4">
-                   <div>
-                     <p className="text-gray-400 text-[10px] font-bold uppercase mb-1">Pick up: Rosebank Mall</p>
-                     <p className="text-white text-sm font-black">To: OR Tambo Int.</p>
-                   </div>
-                   <span className="text-[#008751] font-black text-lg">R320.00</span>
+              {rideRequests.map((trip) => (
+                <div key={trip.id} className="bg-black p-6 rounded-3xl border border-green-900/10 hover:border-[#008751] transition-all">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <p className="text-gray-400 text-[10px] font-bold uppercase mb-1">Pick up: {trip.pickup_location}</p>
+                      <p className="text-white text-sm font-black">To: {trip.destination}</p>
+                    </div>
+                    <span className="text-[#008751] font-black text-lg">R{trip.fare}</span>
+                  </div>
+                  <button
+                    onClick={() => acceptRide(trip.id)}
+                    className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-[#008751] hover:text-white transition"
+                  >
+                    ACCEPT RIDE <ArrowRight size={16} />
+                  </button>
                 </div>
-                <button className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-[#008751] hover:text-white transition">
-                  ACCEPT RIDE <ArrowRight size={16} />
-                </button>
-              </div>
+              ))}
             </div>
           )}
         </div>
@@ -118,7 +192,9 @@ const DriverOverview = () => {
 
               <label className="border-2 border-dashed border-gray-800 p-10 rounded-3xl text-center group cursor-pointer hover:border-[#008751] transition block">
                 <Camera className="mx-auto mb-4 text-gray-700 group-hover:text-green-500" size={32} />
-                <p className="text-xs text-gray-500 font-bold uppercase">Upload License & Car Photo</p>
+                <p className="text-xs text-gray-500 font-bold uppercase">
+                  {vehiclePhoto ? vehiclePhoto.name : 'Upload License & Car Photo'}
+                </p>
                 <input
                   type="file"
                   accept="image/*"

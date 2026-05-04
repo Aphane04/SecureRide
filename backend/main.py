@@ -1,8 +1,9 @@
 import os
+import uuid
 from datetime import datetime, timedelta
 from typing import List
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
@@ -21,7 +22,9 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
 UPLOAD_DIR = "uploads/id_documents"
+VEHICLE_UPLOAD_DIR = "uploads/vehicles"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(VEHICLE_UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_MIME_TO_EXT = {
     "image/jpeg": "jpg",
@@ -157,6 +160,28 @@ def record_consent(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Consent recorded"}
 
+@app.post("/auth/upload-id/{user_id}")
+def upload_id_document(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if file.content_type not in ALLOWED_MIME_TO_EXT:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    data = file.file.read()
+    if len(data) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="File too large")
+
+    ext = ALLOWED_MIME_TO_EXT[file.content_type]
+    filename = f"{uuid.uuid4()}.{ext}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    with open(file_path, "wb") as f:
+        f.write(data)
+
+    return {"message": "ID uploaded", "file": f"/uploads/id_documents/{filename}"}
+
 # --- Trips ---
 @app.post("/trips/estimate", response_model=schemas.TripEstimateResponse)
 def estimate_trip(data: schemas.TripEstimateRequest, user: models.User = Depends(get_current_user)):
@@ -192,6 +217,52 @@ def trip_history(user: models.User = Depends(get_current_user), db: Session = De
     if user.role != "Passenger":
         raise HTTPException(status_code=403, detail="Only passengers can view trip history.")
     return db.query(models.Trip).filter(models.Trip.passenger_id == user.id).order_by(models.Trip.start_time.desc()).all()
+
+@app.get("/trips/requests", response_model=List[schemas.TripOut])
+def trip_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role != "Driver":
+        raise HTTPException(status_code=403, detail="Only drivers can view ride requests.")
+    return db.query(models.Trip).filter(
+        models.Trip.status == "Searching",
+        models.Trip.driver_id.is_(None)
+    ).order_by(models.Trip.start_time.desc()).all()
+
+@app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
+def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role != "Driver":
+        raise HTTPException(status_code=403, detail="Only drivers can accept rides.")
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    if trip.driver_id:
+        raise HTTPException(status_code=400, detail="Trip already accepted")
+    if trip.status != "Searching":
+        raise HTTPException(status_code=400, detail="Trip is not available")
+
+    trip.driver_id = user.id
+    trip.status = "Active"
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+@app.get("/trips/active", response_model=schemas.TripOut)
+def get_active_trip(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role == "Passenger":
+        trip = db.query(models.Trip).filter(
+            models.Trip.passenger_id == user.id,
+            models.Trip.status == "Active"
+        ).order_by(models.Trip.start_time.desc()).first()
+    elif user.role == "Driver":
+        trip = db.query(models.Trip).filter(
+            models.Trip.driver_id == user.id,
+            models.Trip.status == "Active"
+        ).order_by(models.Trip.start_time.desc()).first()
+    else:
+        raise HTTPException(status_code=403, detail="Only passengers or drivers can view active trips.")
+
+    if not trip:
+        raise HTTPException(status_code=404, detail="No active trip")
+    return trip
 
 # --- Contacts ---
 @app.post("/contacts", response_model=schemas.EmergencyContactOut)
@@ -237,6 +308,44 @@ def delete_contact(contact_id: int, user: models.User = Depends(get_current_user
     db.delete(existing)
     db.commit()
     return {"message": "Contact deleted"}
+
+# --- Vehicle Upload ---
+@app.post("/vehicles/register", response_model=schemas.VehicleOut)
+def register_vehicle(
+    make_model: str = Form(...),
+    plate_number: str = Form(...),
+    photo: UploadFile = File(None),
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.role != "Driver":
+        raise HTTPException(status_code=403, detail="Only drivers can register vehicles.")
+
+    driver = db.query(models.Driver).filter(models.Driver.user_id == user.id).first()
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver profile not found.")
+
+    photo_url = None
+    if photo:
+        if photo.content_type not in ALLOWED_MIME_TO_EXT:
+            raise HTTPException(status_code=400, detail="Unsupported file type.")
+        ext = ALLOWED_MIME_TO_EXT[photo.content_type]
+        filename = f"{uuid.uuid4()}.{ext}"
+        file_path = os.path.join(VEHICLE_UPLOAD_DIR, filename)
+        with open(file_path, "wb") as f:
+            f.write(photo.file.read())
+        photo_url = f"/uploads/vehicles/{filename}"
+
+    vehicle = models.Vehicle(
+        driver_id=user.id,
+        make_model=make_model,
+        plate_number=plate_number,
+        photo_url=photo_url
+    )
+    db.add(vehicle)
+    db.commit()
+    db.refresh(vehicle)
+    return vehicle
 
 # --- Admin Endpoints ---
 @app.get("/admin/overview", response_model=schemas.AdminOverviewOut)

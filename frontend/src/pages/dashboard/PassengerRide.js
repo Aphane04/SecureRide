@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, Marker } from '@react-google-maps/api';
 import { useAiMonitor } from '../../utils/aiMonitor';
 import { Shield, MapPin, Navigation, Search } from 'lucide-react';
@@ -30,29 +30,29 @@ const PassengerRide = () => {
     libraries: ['places'],
   });
 
-  const [map, setMap] = useState(null);
   const [directionsResponse, setDirectionsResponse] = useState(null);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [fare, setFare] = useState(null);
   const [bookingMessage, setBookingMessage] = useState('');
-  const [activeTrip, setActiveTrip] = useState(null);
+  const [activeTripId, setActiveTripId] = useState(null);
+  const [activeTripDetails, setActiveTripDetails] = useState(null);
   const [distanceKm, setDistanceKm] = useState(0);
   const [durationMinutes, setDurationMinutes] = useState(0);
 
   const originRef = useRef();
   const destinationRef = useRef();
 
-  const { dangerDetected } = useAiMonitor(activeTrip);
+  const { dangerDetected } = useAiMonitor(activeTripId);
 
   async function calculateRoute() {
     if (originRef.current.value === '' || destinationRef.current.value === '') return;
 
-    const directionsService = new google.maps.DirectionsService();
+    const directionsService = new window.google.maps.DirectionsService();
     const results = await directionsService.route({
       origin: originRef.current.value,
       destination: destinationRef.current.value,
-      travelMode: google.maps.TravelMode.DRIVING,
+      travelMode: window.google.maps.TravelMode.DRIVING,
     });
 
     const distanceText = results.routes[0].legs[0].distance.text;
@@ -86,40 +86,68 @@ const PassengerRide = () => {
       duration_minutes: durationMinutes,
       fare,
     });
-    setActiveTrip(response.data.id);
+    setActiveTripId(response.data.id);
     setBookingMessage('Ride request sent. Driver is being matched.');
   };
 
-  if (!isLoaded) return <div className="bg-black h-screen flex items-center justify-center text-green-500">Initializing Maps...</div>;
+  useEffect(() => {
+    if (!activeTripId) return;
+
+    const poll = async () => {
+      try {
+        const res = await tripAPI.getActiveTrip();
+        setActiveTripDetails(res.data);
+        setBookingMessage('Driver accepted. Heading to pickup.');
+      } catch (err) {}
+    };
+
+    poll();
+    const timer = setInterval(poll, 5000);
+    return () => clearInterval(timer);
+  }, [activeTripId]);
+
+  useEffect(() => {
+    if (!activeTripDetails || directionsResponse || !window.google) return;
+    const service = new window.google.maps.DirectionsService();
+    service.route(
+      {
+        origin: activeTripDetails.pickup_location,
+        destination: activeTripDetails.destination,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === 'OK') setDirectionsResponse(result);
+      }
+    );
+  }, [activeTripDetails, directionsResponse]);
+
+  if (!isLoaded) return null;
 
   return (
     <div className="h-[calc(100vh-64px)] bg-[#0f0f0f] text-white">
-      {/* Map at Top */}
       <div className="h-[55%] relative">
         <GoogleMap
           center={center}
           zoom={15}
           mapContainerStyle={{ width: '100%', height: '100%' }}
           options={{ disableDefaultUI: true }}
-          onLoad={(map) => setMap(map)}
         >
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
           {!directionsResponse && <Marker position={center} />}
         </GoogleMap>
 
         <div className="absolute top-6 left-6 z-10">
-          {activeTrip && (
-            <div className={`px-5 py-2 rounded-full flex items-center gap-3 border shadow-2xl transition-all ${dangerDetected ? 'bg-red-600 border-red-400 animate-pulse' : 'bg-green-900/40 border-green-500/50 backdrop-blur-md'}`}>
+          {activeTripDetails && (
+            <div className={`px-5 py-2 rounded-full flex items-center gap-3 border shadow-2xl transition-all ${dangerDetected ? 'bg-red-600 border-red-400 animate-pulse' : 'bg-green-900/40 border-green-500'}`}>
               <div className={`w-2 h-2 rounded-full ${dangerDetected ? 'bg-white' : 'bg-green-500 animate-ping'}`} />
               <span className="text-[10px] font-black uppercase tracking-widest">
-                {dangerDetected ? 'DANGER DETECTED - CONTACTING LAW' : 'AI Safety Protocol Active'}
+                {dangerDetected ? 'DANGER DETECTED - CONTACTING LAW' : 'Active Trip in Progress'}
               </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Form at Bottom */}
       <div className="h-[45%] p-6 border-t border-gray-900 bg-[#121212] overflow-auto">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-xl font-bold flex items-center gap-2 mb-4">

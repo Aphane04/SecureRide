@@ -126,3 +126,12 @@ class AdminAlertOut(BaseModel):
     trip_id: int
     transcript: str
     detected_at: datetime
+
+class VehicleOut(BaseModel):
+    id: int
+    make_model: str
+    plate_number: str
+    photo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
