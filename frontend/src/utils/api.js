@@ -33,6 +33,7 @@ export const tripAPI = {
   bookRide: (data) => api.post('/trips/book', data),
   getHistory: () => api.get('/trips/history'),
   getDriverHistory: () => api.get('/trips/driver-history'),
+  getActiveTrip: () => api.get('/trips/active'),
   updateLocation: (tripId, coords) => api.patch(`/trips/${tripId}/location`, coords),
   triggerAlert: (tripId, transcript) => api.post(`/trips/${tripId}/emergency`, { transcript }),
 };
