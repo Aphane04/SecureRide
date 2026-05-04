@@ -23,6 +23,10 @@ import DriverContacts from './pages/dashboard/DriverContacts';
 import DriverAccount from './pages/dashboard/DriverAccount';
 
 import AdminDash from './pages/dashboard/AdminDash';
+import AdminOverview from './pages/dashboard/AdminOverview';
+import AdminDrivers from './pages/dashboard/AdminDrivers';
+import AdminPassengers from './pages/dashboard/AdminPassengers';
+import AdminAlerts from './pages/dashboard/AdminAlerts';
 
 function App() {
   return (
@@ -58,9 +62,14 @@ function App() {
           <Route path="account" element={<DriverAccount />} />
         </Route>
 
-        <Route path="/dashboard/admin" element={
-          <ProtectedRoute allowedRoles={['Admin']}><Layout><AdminDash /></Layout></ProtectedRoute>
-        } />
+       <Route path="/dashboard/admin" element={
+  <ProtectedRoute allowedRoles={['Admin']}><Layout><AdminDash /></Layout></ProtectedRoute>
+}>
+  <Route index element={<AdminOverview />} />
+  <Route path="drivers" element={<AdminDrivers />} />
+  <Route path="passengers" element={<AdminPassengers />} />
+  <Route path="alerts" element={<AdminAlerts />} />
+</Route>
 
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>

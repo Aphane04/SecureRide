@@ -50,4 +50,12 @@ export const vehicleAPI = {
     api.post('/vehicles/register', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
+export const adminAPI = {
+  overview: () => api.get('/admin/overview'),
+  trips: () => api.get('/admin/trips'),
+  drivers: () => api.get('/admin/drivers'),
+  passengers: () => api.get('/admin/passengers'),
+  alerts: () => api.get('/admin/alerts'),
+};
+
 export default api;
