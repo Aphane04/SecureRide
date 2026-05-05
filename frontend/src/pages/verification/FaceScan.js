@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import * as faceapi from 'face-api.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserCheck, RefreshCw } from 'lucide-react';
 import { authAPI } from '../../utils/api';
@@ -12,8 +11,8 @@ const FaceScan = () => {
 
   const [status, setStatus] = useState("Initializing AI...");
   const [step, setStep] = useState(0); // 0: Straight, 1: Left, 2: Right, 3: Success
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [faceapi, setFaceapi] = useState(null);
 
   // Store interval ID in a ref so it can be cleared on unmount or completion
   const intervalRef = useRef(null);
@@ -21,15 +20,28 @@ const FaceScan = () => {
   const steps = ["Look Straight", "Turn Head Left", "Turn Head Right"];
 
   useEffect(() => {
-    const loadModels = async () => {
-      const MODEL_URL = '/models';
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      ]);
-      startVideo();
+    const loadFaceAPI = async () => {
+      try {
+        // Dynamic import to avoid fs module error in browser
+        const faceapiModule = await import('face-api.js');
+        setFaceapi(faceapiModule);
+
+        // Load face detection models
+        const MODEL_URL = '/models';
+        await Promise.all([
+          faceapiModule.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapiModule.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        ]);
+        
+        // Start video after models are loaded
+        startVideo();
+      } catch (err) {
+        console.error('Failed to load face-api:', err);
+        setError('Failed to initialize facial recognition. Please refresh the page.');
+      }
     };
-    loadModels();
+
+    loadFaceAPI();
 
     return () => {
       // Clear detection interval on unmount
@@ -47,7 +59,6 @@ const FaceScan = () => {
     navigator.mediaDevices.getUserMedia({ video: {} })
       .then((stream) => {
         videoRef.current.srcObject = stream;
-        setLoading(false);
         setStatus(steps[0]);
       })
       .catch((err) => {
@@ -57,43 +68,49 @@ const FaceScan = () => {
   };
 
   const handleVideoPlay = () => {
+    if (!faceapi) return;
+
     intervalRef.current = setInterval(async () => {
       if (!videoRef.current) return;
 
-      const detections = await faceapi.detectSingleFace(
-        videoRef.current,
-        new faceapi.TinyFaceDetectorOptions()
-      ).withFaceLandmarks();
+      try {
+        const detections = await faceapi.detectSingleFace(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions()
+        ).withFaceLandmarks();
 
-      if (detections) {
-        const landmarks = detections.landmarks;
-        const nose = landmarks.getNose();
-        const jaw = landmarks.getJawOutline();
+        if (detections) {
+          const landmarks = detections.landmarks;
+          const nose = landmarks.getNose();
+          const jaw = landmarks.getJawOutline();
 
-        // Liveness logic: relative nose position within jaw width
-        const noseX = nose[0].x;
-        const jawWidth = jaw[16].x - jaw[0].x;
-        const relativePos = (noseX - jaw[0].x) / jawWidth;
+          // Liveness logic: relative nose position within jaw width
+          const noseX = nose[0].x;
+          const jawWidth = jaw[16].x - jaw[0].x;
+          const relativePos = (noseX - jaw[0].x) / jawWidth;
 
-        setStep((prev) => {
-          if (prev === 0 && relativePos > 0.4 && relativePos < 0.6) {
-            setStatus(steps[1]);
-            return 1;
-          } else if (prev === 1 && relativePos < 0.3) {
-            setStatus(steps[2]);
-            return 2;
-          } else if (prev === 2 && relativePos > 0.7) {
-            setStatus("Verification Successful");
-            clearInterval(intervalRef.current);
-            // Stop camera stream
-            if (videoRef.current?.srcObject) {
-              videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
+          setStep((prev) => {
+            if (prev === 0 && relativePos > 0.4 && relativePos < 0.6) {
+              setStatus(steps[1]);
+              return 1;
+            } else if (prev === 1 && relativePos < 0.3) {
+              setStatus(steps[2]);
+              return 2;
+            } else if (prev === 2 && relativePos > 0.7) {
+              setStatus("Verification Successful");
+              clearInterval(intervalRef.current);
+              // Stop camera stream
+              if (videoRef.current?.srcObject) {
+                videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
+              }
+              completeVerification();
+              return 3;
             }
-            completeVerification();
-            return 3;
-          }
-          return prev;
-        });
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error('Face detection error:', err);
       }
     }, 500);
   };
