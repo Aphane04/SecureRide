@@ -60,3 +60,6 @@ def get_db():
 def init_db():
     import models  # Imported here to avoid circular imports
     Base.metadata.create_all(bind=engine)
+
+print("DATABASE_URL (raw):", SQLALCHEMY_DATABASE_URL)
+print("Drivername:", SQLALCHEMY_DATABASE_URL.split("://")[0])
