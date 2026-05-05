@@ -31,6 +31,8 @@ else:
     # For production without custom CA (Render, Aiven cloud, etc.)
     connect_args["ssl"] = {"check_hostname": False}
 
+print("DATABASE_URL (raw):", SQLALCHEMY_DATABASE_URL)
+print("Drivername:", SQLALCHEMY_DATABASE_URL.split("://")[0])
 # Configure the Engine
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
@@ -61,5 +63,3 @@ def init_db():
     import models  # Imported here to avoid circular imports
     Base.metadata.create_all(bind=engine)
 
-print("DATABASE_URL (raw):", SQLALCHEMY_DATABASE_URL)
-print("Drivername:", SQLALCHEMY_DATABASE_URL.split("://")[0])
