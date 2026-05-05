@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse, urlunparse
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -20,6 +21,10 @@ if "mysql://" in SQLALCHEMY_DATABASE_URL:
 elif "mysql+mysqlconnector://" in SQLALCHEMY_DATABASE_URL:
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("mysql+mysqlconnector://", "mysql+pymysql://")
 
+# Force the scheme to exactly mysql+pymysql (prevents SQLAlchemy "too many values to unpack")
+parsed = urlparse(SQLALCHEMY_DATABASE_URL)
+SQLALCHEMY_DATABASE_URL = urlunparse(parsed._replace(scheme="mysql+pymysql"))
+
 # SSL config for Aiven (if provided)
 connect_args = {
     "charset": "utf8mb4",
@@ -31,8 +36,6 @@ else:
     # For production without custom CA (Render, Aiven cloud, etc.)
     connect_args["ssl"] = {"check_hostname": False}
 
-print("DATABASE_URL (raw):", SQLALCHEMY_DATABASE_URL)
-print("Drivername:", SQLALCHEMY_DATABASE_URL.split("://")[0])
 # Configure the Engine
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
@@ -62,4 +65,3 @@ def get_db():
 def init_db():
     import models  # Imported here to avoid circular imports
     Base.metadata.create_all(bind=engine)
-
