@@ -85,7 +85,7 @@ def startup():
 
 def get_password_hash(password):
     # Hash with SHA256 first to avoid bcrypt 72-byte limit
-    password = hashlib.sha256(password.encode()).hexdigest()
+    password = hashlib.sha256(password.encode()).digest()
     return pwd_context.hash(password)
 
 
