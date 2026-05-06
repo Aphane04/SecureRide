@@ -40,6 +40,29 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 app = FastAPI(title="SecureRide API")
 
+# --- CORS Configuration - MUST BE ADDED FIRST, BEFORE STATIC FILES ---
+# Read ALLOWED_ORIGINS from environment variable
+ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        "ALLOWED_ORIGINS", 
+        "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+]
+
+print(f"🔧 Configuring CORS for origins: {ALLOWED_ORIGINS}")
+
+# Add CORS middleware FIRST
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+# THEN mount static files (AFTER middleware)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 @app.get("/")
 def root():
     return {
@@ -51,29 +74,6 @@ def root():
 def health():
     return {"status": "healthy"}
 
-# --- CORS Configuration - MUST BE FIRST BEFORE STATIC FILES ---
-# Read ALLOWED_ORIGINS from environment variable
-ALLOWED_ORIGINS = [
-    origin.strip() for origin in os.getenv(
-        "ALLOWED_ORIGINS", 
-        "http://localhost:3000,http://127.0.0.1:3000"
-    ).split(",")
-]
-
-print(f"🔧 Configuring CORS for origins: {ALLOWED_ORIGINS}")
-
-# Add CORS middleware FIRST, before everything else
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-# THEN mount static files
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
 @app.on_event("startup")
 def startup():
     try:
@@ -82,7 +82,7 @@ def startup():
         print(f"✓ CORS allowed origins: {ALLOWED_ORIGINS}")
     except Exception as e:
         print(f"✗ Database connection failed: {e}")
-
+        
 def get_password_hash(password):
     # Hash with SHA256 first to avoid bcrypt 72-byte limit
     password_hash = hashlib.sha256(password.encode()).hexdigest()
