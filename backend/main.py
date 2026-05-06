@@ -1,5 +1,6 @@
 import os
 import uuid
+import hashlib
 from datetime import datetime, timedelta
 from typing import List
 
@@ -14,7 +15,6 @@ from dotenv import load_dotenv
 
 from database import engine, Base, get_db
 import models, schemas
-import hashlib
 
 load_dotenv()
 
@@ -85,14 +85,13 @@ def startup():
 
 def get_password_hash(password):
     # Hash with SHA256 first to avoid bcrypt 72-byte limit
-    password = hashlib.sha256(password.encode()).digest()
-    return pwd_context.hash(password)
-
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    return pwd_context.hash(password_hash)
 
 def verify_password(plain_password, hashed_password):
-    # Apply same SHA256 before verification
-    plain_password = hashlib.sha256(plain_password.encode()).hexdigest()
-    return pwd_context.verify(plain_password, hashed_password)
+    # Apply same SHA256 before verification (use hexdigest to match get_password_hash)
+    plain_password_hash = hashlib.sha256(plain_password.encode()).hexdigest()
+    return pwd_context.verify(plain_password_hash, hashed_password)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -228,7 +227,6 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Mark user as verified after facial verification
     user.is_verified = True
     db.commit()
     
