@@ -14,9 +14,14 @@ const FaceScan = () => {
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
-  const [headPosition, setHeadPosition] = useState("center");
+  const [headPosition, setHeadPosition] = useState("none");
   const [verificationProgress, setVerificationProgress] = useState(0);
   const [faceapi, setFaceapi] = useState(null);
+  const [detectionStats, setDetectionStats] = useState({
+    center: false,
+    left: false,
+    right: false
+  });
 
   const detectionIntervalRef = useRef(null);
   const streamRef = useRef(null);
@@ -24,7 +29,7 @@ const FaceScan = () => {
 
   const steps = ["Loading Models", "Position Face", "Verify Movement", "Complete"];
 
-  // Memoize initializeCamera to fix dependency warning
+  // Memoize initializeCamera
   const initializeCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -56,7 +61,7 @@ const FaceScan = () => {
       try {
         // Wait for face-api to load from CDN (global window.faceapi)
         let attempts = 0;
-        while (!window.faceapi && attempts < 50) {
+        while (!window.faceapi && attempts < 100) {
           await new Promise(resolve => setTimeout(resolve, 100));
           attempts++;
         }
@@ -65,6 +70,7 @@ const FaceScan = () => {
           throw new Error('face-api.js failed to load from CDN');
         }
 
+        console.log('✓ face-api.js loaded from CDN');
         setFaceapi(window.faceapi);
 
         // Load the 4 pre-trained models from public/models directory
@@ -73,17 +79,11 @@ const FaceScan = () => {
         console.log('📦 Loading 4 face detection models...');
         
         await Promise.all([
-          // Model 1 & 2: Tiny Face Detector + weights
           window.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          // Model 3 & 4: Face Landmarks (68 points) + weights
           window.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         ]);
 
-        console.log('✓ All 4 models loaded successfully:');
-        console.log('  1. tiny_face_detector_model.bin');
-        console.log('  2. tiny_face_detector_model-weights_manifest.json');
-        console.log('  3. face_landmark_68_model.bin');
-        console.log('  4. face_landmark_68_model-weights_manifest.json');
+        console.log('✓ All 4 models loaded successfully');
         
         setStatus("Models loaded. Enable camera access.");
         setStep(1);
@@ -112,11 +112,10 @@ const FaceScan = () => {
     detectionIntervalRef.current = setInterval(async () => {
       try {
         const video = videoRef.current;
-        const canvas = canvasRef.current;
 
         if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
 
-        // Use window.faceapi for detection + landmarks
+        // Detect face with landmarks
         const detections = await window.faceapi
           .detectSingleFace(video, new window.faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks();
@@ -125,64 +124,85 @@ const FaceScan = () => {
           setFaceDetected(true);
           
           const landmarks = detections.landmarks;
-          const box = detections.detection.box;
-          
-          // Extract landmarks from the 68-point model
-          const nose = landmarks.getNose();
-          const jaw = landmarks.getJawOutline();
           const leftEye = landmarks.getLeftEye();
           const rightEye = landmarks.getRightEye();
+          const nose = landmarks.getNose();
+          const mouth = landmarks.getMouth();
 
-          // Calculate head turn angle
-          const eyeDistance = rightEye[0].x - leftEye[0].x;
+          // Calculate more reliable head position using multiple landmarks
+          const leftEyeX = leftEye[0].x;
+          const rightEyeX = rightEye[0].x;
           const noseX = nose[0].x;
-          const noseToLeftEye = noseX - leftEye[0].x;
-          const noseToRightEye = rightEye[0].x - noseX;
+          const mouthX = mouth[0].x;
 
+          // Eye distance for normalization
+          const eyeDistance = rightEyeX - leftEyeX;
+          
+          // Calculate nose position relative to eyes (0 = far left, 1 = far right)
+          const noseRelativePos = (noseX - leftEyeX) / eyeDistance;
+
+          // Determine head position with adjusted thresholds
           let currentPosition = 'center';
-          const ratio = noseToLeftEye / eyeDistance;
-
-          if (ratio < 0.3) {
-            currentPosition = 'right';
-          } else if (ratio > 0.7) {
-            currentPosition = 'left';
+          
+          if (noseRelativePos < 0.35) {
+            currentPosition = 'right'; // Looking right
+          } else if (noseRelativePos > 0.65) {
+            currentPosition = 'left'; // Looking left
           } else {
-            currentPosition = 'center';
+            currentPosition = 'center'; // Looking straight
           }
 
           setHeadPosition(currentPosition);
 
+          // Track position history
           positionHistoryRef.current.push(currentPosition);
-          if (positionHistoryRef.current.length > 50) {
+          if (positionHistoryRef.current.length > 100) {
             positionHistoryRef.current.shift();
           }
 
+          // Check if all required movements have been detected
           const hasLeftTurn = positionHistoryRef.current.includes('left');
           const hasRightTurn = positionHistoryRef.current.includes('right');
           const hasCenterPosition = positionHistoryRef.current.includes('center');
 
+          // Update detection stats
+          setDetectionStats({
+            center: hasCenterPosition,
+            left: hasLeftTurn,
+            right: hasRightTurn
+          });
+
+          // Calculate progress
           let progress = 0;
           if (hasCenterPosition) progress += 33;
           if (hasLeftTurn) progress += 33;
           if (hasRightTurn) progress += 34;
 
           setVerificationProgress(progress);
-          setStatus(`Face detected! Move your head: ${progress}% verified`);
+          
+          // Update status with current detection
+          let statusMsg = `Face detected! `;
+          if (!hasCenterPosition) statusMsg += `Look straight → `;
+          if (!hasLeftTurn) statusMsg += `Turn left → `;
+          if (!hasRightTurn) statusMsg += `Turn right`;
+          statusMsg += ` (${progress}% verified)`;
+          
+          setStatus(statusMsg);
 
+          // Complete verification when all movements detected
           if (hasLeftTurn && hasRightTurn && hasCenterPosition) {
+            console.log('✓ All head movements detected! Completing verification...');
             completeVerification();
           }
         } else {
           setFaceDetected(false);
-          setVerificationProgress(0);
-          positionHistoryRef.current = [];
-          setStatus("Position your face clearly in the circle");
           setHeadPosition('none');
+          setStatus("Position your face clearly in the circle");
         }
       } catch (err) {
         console.error('Face detection error:', err);
       }
-    }, 300);
+    }, 300); // Run detection every 300ms
   };
 
   const completeVerification = async () => {
@@ -210,6 +230,7 @@ const FaceScan = () => {
       setError('Verification failed. Please try again.');
       setStep(2);
       setVerificationProgress(0);
+      setDetectionStats({ center: false, left: false, right: false });
       positionHistoryRef.current = [];
       
       startFaceDetection();
@@ -346,18 +367,18 @@ const FaceScan = () => {
           <p className="text-xs text-gray-500 uppercase tracking-widest mb-3">Required Head Movements:</p>
           <div className="flex gap-3 justify-center text-xs text-gray-400">
             <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${positionHistoryRef.current?.includes('center') ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
-              Look Straight
+              <div className={`w-2 h-2 rounded-full ${detectionStats.center ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
+              Look Straight ✓
             </div>
             <div className="text-gray-600">•</div>
             <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${positionHistoryRef.current?.includes('left') ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
-              Turn Left
+              <div className={`w-2 h-2 rounded-full ${detectionStats.left ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
+              Turn Left ✓
             </div>
             <div className="text-gray-600">•</div>
             <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${positionHistoryRef.current?.includes('right') ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
-              Turn Right
+              <div className={`w-2 h-2 rounded-full ${detectionStats.right ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
+              Turn Right ✓
             </div>
           </div>
         </div>
