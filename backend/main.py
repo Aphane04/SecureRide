@@ -74,14 +74,7 @@ def root():
 def health():
     return {"status": "healthy"}
 
-# --- CORS Preflight Handler - Catch all OPTIONS requests ---
-@app.options("/{full_path:path}")
-async def preflight(full_path: str):
-    """
-    Catch all preflight OPTIONS requests.
-    This handles CORS preflight for all endpoints.
-    """
-    return {"detail": "ok"}
+
 
 @app.on_event("startup")
 def startup():
