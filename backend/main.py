@@ -37,27 +37,20 @@ MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+# Create app FIRST
 app = FastAPI(title="SecureRide API")
 
-# --- CORS Configuration - MUST BE FIRST BEFORE STATIC FILES ---
-# Read ALLOWED_ORIGINS from environment variable
-ALLOWED_ORIGINS = [
-    origin.strip() for origin in os.getenv(
-        "ALLOWED_ORIGINS", 
-        "http://localhost:3000,http://127.0.0.1:3000"
-    ).split(",")
-]
-
-print(f"🔧 Configuring CORS for origins: {ALLOWED_ORIGINS}")
-
-# Add CORS middleware FIRST, before everything else
+# --- AGGRESSIVE CORS Configuration (TEST MODE) ---
+# Allow ALL origins for testing - we'll restrict later
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],  # Allow ALL origins temporarily
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+
+print("🔧 CORS configured to allow ALL origins (TEST MODE)")
 
 # THEN mount static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -67,7 +60,7 @@ def startup():
     try:
         Base.metadata.create_all(bind=engine)
         print("✓ Database connection successful")
-        print(f"✓ CORS allowed origins: {ALLOWED_ORIGINS}")
+        print("✓ CORS enabled for all origins (TEST MODE)")
     except Exception as e:
         print(f"✗ Database connection failed: {e}")
 
