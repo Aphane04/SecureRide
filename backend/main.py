@@ -40,12 +40,21 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 app = FastAPI(title="SecureRide API")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+# --- CORS Configuration ---
+# Read ALLOWED_ORIGINS from environment variable, split by comma, and strip whitespace
+ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        "ALLOWED_ORIGINS", 
+        "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+]
+
+# Add CORS middleware BEFORE routes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -54,8 +63,10 @@ def startup():
     try:
         Base.metadata.create_all(bind=engine)
         print("✓ Database connection successful")
+        print(f"✓ CORS allowed origins: {ALLOWED_ORIGINS}")
     except Exception as e:
         print(f"✗ Database connection failed: {e}")
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -185,6 +196,26 @@ def upload_id_document(user_id: int, file: UploadFile = File(...), db: Session =
         f.write(data)
 
     return {"message": "ID uploaded", "file": f"/uploads/id_documents/{filename}"}
+
+@app.post("/auth/verify-liveness/{user_id}")
+def verify_liveness(user_id: int, db: Session = Depends(get_db)):
+    """
+    Endpoint called after successful facial verification.
+    Marks the user as verified to allow dashboard access.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Mark user as verified after facial verification
+    user.is_verified = True
+    db.commit()
+    
+    return {
+        "message": "Facial verification successful",
+        "user_id": user.id,
+        "is_verified": True
+    }
 
 # --- Trips ---
 @app.post("/trips/estimate", response_model=schemas.TripEstimateResponse)
