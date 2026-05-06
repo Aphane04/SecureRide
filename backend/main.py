@@ -39,6 +39,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 app = FastAPI(title="SecureRide API")
 
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "message": "SecureRide API is running"
+    }
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
 # --- CORS Configuration - MUST BE FIRST BEFORE STATIC FILES ---
 # Read ALLOWED_ORIGINS from environment variable
 ALLOWED_ORIGINS = [
