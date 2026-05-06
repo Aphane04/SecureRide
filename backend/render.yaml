@@ -1,0 +1,7 @@
+envVars:
+  - key: ALLOWED_ORIGINS
+    value: https://secure-ride-zeta.vercel.app
+  - key: DATABASE_URL
+    sync: false
+  - key: JWT_SECRET_KEY
+    sync: false
