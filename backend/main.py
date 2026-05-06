@@ -74,6 +74,30 @@ def root():
 def health():
     return {"status": "healthy"}
 
+# --- Explicit CORS preflight handlers ---
+@app.options("/auth/register")
+@app.options("/auth/login")
+@app.options("/auth/consent/{user_id}")
+@app.options("/auth/upload-id/{user_id}")
+@app.options("/auth/verify-liveness/{user_id}")
+@app.options("/auth/users/me")
+@app.options("/trips/estimate")
+@app.options("/trips/book")
+@app.options("/trips/history")
+@app.options("/trips/requests")
+@app.options("/trips/{trip_id}/accept")
+@app.options("/trips/active")
+@app.options("/contacts")
+@app.options("/contacts/{contact_id}")
+@app.options("/vehicles/register")
+@app.options("/admin/overview")
+@app.options("/admin/trips")
+@app.options("/admin/drivers")
+@app.options("/admin/passengers")
+@app.options("/admin/alerts")
+async def options_handler():
+    return {"status": "ok"}
+
 @app.on_event("startup")
 def startup():
     try:
@@ -82,7 +106,7 @@ def startup():
         print(f"✓ CORS allowed origins: {ALLOWED_ORIGINS}")
     except Exception as e:
         print(f"✗ Database connection failed: {e}")
-        
+
 def get_password_hash(password):
     # Hash with SHA256 first to avoid bcrypt 72-byte limit
     password_hash = hashlib.sha256(password.encode()).hexdigest()
