@@ -37,23 +37,30 @@ MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+# Create app FIRST
 app = FastAPI(title="SecureRide API")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Fixed: Read from environment variable and split by comma
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+# --- CORS Configuration - MUST BE FIRST ---
+# Read from environment variable and strip whitespace
+ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        "ALLOWED_ORIGINS", 
+        "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+]
 
+print(f"🔧 Configuring CORS for origins: {ALLOWED_ORIGINS}")
+
+# Add CORS middleware FIRST, before anything else
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# Rest of the file remains the same...
-
-# THEN mount static files
+# THEN mount static files (AFTER middleware)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.on_event("startup")
@@ -205,7 +212,6 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Mark user as verified after facial verification
     user.is_verified = True
     db.commit()
     
