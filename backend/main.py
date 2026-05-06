@@ -40,8 +40,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 app = FastAPI(title="SecureRide API")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://secure-ride-zeta.vercel.app
-
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
