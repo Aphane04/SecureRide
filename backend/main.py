@@ -38,10 +38,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 app = FastAPI(title="SecureRide API")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# --- CORS Configuration ---
-# Read ALLOWED_ORIGINS from environment variable, split by comma, and strip whitespace
+# --- CORS Configuration - MUST BE FIRST BEFORE STATIC FILES ---
+# Read ALLOWED_ORIGINS from environment variable
 ALLOWED_ORIGINS = [
     origin.strip() for origin in os.getenv(
         "ALLOWED_ORIGINS", 
@@ -49,14 +48,19 @@ ALLOWED_ORIGINS = [
     ).split(",")
 ]
 
-# Add CORS middleware BEFORE routes
+print(f"🔧 Configuring CORS for origins: {ALLOWED_ORIGINS}")
+
+# Add CORS middleware FIRST, before everything else
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# THEN mount static files
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.on_event("startup")
 def startup():
