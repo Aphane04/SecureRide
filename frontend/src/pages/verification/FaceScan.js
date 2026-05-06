@@ -1,188 +1,387 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as faceapi from 'face-api.js';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserCheck, RefreshCw, AlertCircle } from 'lucide-react';
 import { authAPI } from '../../utils/api';
 
 const FaceScan = () => {
-  const videoRef = useRef(null);
-  const intervalRef = useRef(null);
+  const videoRef = useRef();
+  const canvasRef = useRef();
   const navigate = useNavigate();
   const location = useLocation();
   const userId = location.state?.userId;
 
-  const [status, setStatus] = useState("Loading models...");
+  const [status, setStatus] = useState("Loading facial recognition models...");
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
+  const [headPosition, setHeadPosition] = useState("none");
+  const [verificationProgress, setVerificationProgress] = useState(0);
+  const [faceapi, setFaceapi] = useState(null);
+  const [detectionStats, setDetectionStats] = useState({
+    center: false,
+    left: false,
+    right: false
+  });
 
-  const steps = ["Look Straight", "Turn Left", "Turn Right", "Complete"];
+  const detectionIntervalRef = useRef(null);
+  const streamRef = useRef(null);
+  const positionHistoryRef = useRef([]);
 
-  // ✅ Load models + start camera
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const MODEL_URL = '/models';
+  const steps = ["Loading Models", "Position Face", "Verify Movement", "Complete"];
 
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        ]);
-
-        console.log('✅ Models loaded');
-
-        setStatus("Starting camera...");
-        startVideo();
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load face models");
-      }
-    };
-
-    init();
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(t => t.stop());
-      }
-    };
-  }, []);
-
-  // ✅ Start camera
-  const startVideo = async () => {
+  // Memoize initializeCamera
+  const initializeCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+      });
 
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-
-        videoRef.current.onloadeddata = () => {
-          videoRef.current.play();
-          setStatus(steps[0]);
-          startDetection();
+        videoRef.current.onloadedmetadata = () => {
+          setStatus("Position your face in the circle");
+          setStep(2);
+          startFaceDetection();
         };
       }
     } catch (err) {
-      console.error(err);
-      setError("Camera access denied. Please allow camera.");
+      console.error('Camera access error:', err);
+      setError('Camera access denied. Please enable camera permissions and refresh.');
     }
-  };
+  }, []);
 
-  // ✅ Face detection loop
-  const startDetection = () => {
-    intervalRef.current = setInterval(async () => {
+  // Load face-api library from CDN and load models
+  useEffect(() => {
+    const loadFaceAPI = async () => {
       try {
-        if (!videoRef.current) return;
-
-        const detection = await faceapi
-          .detectSingleFace(
-            videoRef.current,
-            new faceapi.TinyFaceDetectorOptions()
-          )
-          .withFaceLandmarks();
-
-        if (!detection) {
-          setFaceDetected(false);
-          return;
+        // Wait for face-api to load from CDN (global window.faceapi)
+        let attempts = 0;
+        while (!window.faceapi && attempts < 100) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
         }
 
-        setFaceDetected(true);
+        if (!window.faceapi) {
+          throw new Error('face-api.js failed to load from CDN');
+        }
 
-        const nose = detection.landmarks.getNose();
-        const jaw = detection.landmarks.getJawOutline();
+        console.log('✓ face-api.js loaded from CDN');
+        setFaceapi(window.faceapi);
 
-        const noseX = nose[0].x;
-        const jawWidth = jaw[16].x - jaw[0].x;
-        const relativePos = (noseX - jaw[0].x) / jawWidth;
+        // Load the 4 pre-trained models from public/models directory
+        const MODEL_URL = '/models';
+        
+        console.log('📦 Loading 4 face detection models...');
+        
+        await Promise.all([
+          window.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          window.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        ]);
 
-        setStep(prev => {
-          if (prev === 0 && relativePos > 0.4 && relativePos < 0.6) {
-            setStatus(steps[1]);
-            return 1;
-          }
-          if (prev === 1 && relativePos < 0.35) {
-            setStatus(steps[2]);
-            return 2;
-          }
-          if (prev === 2 && relativePos > 0.65) {
-            completeVerification();
-            return 3;
-          }
-          return prev;
-        });
-
+        console.log('✓ All 4 models loaded successfully');
+        
+        setStatus("Models loaded. Enable camera access.");
+        setStep(1);
+        initializeCamera();
       } catch (err) {
-        console.error('Detection error:', err);
-        setError("Face detection failed");
+        console.error('Failed to load face-api models:', err);
+        setError('Failed to load facial recognition models. Please refresh and try again.');
       }
-    }, 500);
+    };
+
+    loadFaceAPI();
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
+    };
+  }, [initializeCamera]);
+
+  const startFaceDetection = () => {
+    if (!videoRef.current || !faceapi || !canvasRef.current) return;
+
+    detectionIntervalRef.current = setInterval(async () => {
+      try {
+        const video = videoRef.current;
+
+        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+        // Detect face with landmarks
+        const detections = await window.faceapi
+          .detectSingleFace(video, new window.faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks();
+
+        if (detections) {
+          setFaceDetected(true);
+          
+          const landmarks = detections.landmarks;
+          const leftEye = landmarks.getLeftEye();
+          const rightEye = landmarks.getRightEye();
+          const nose = landmarks.getNose();
+          const mouth = landmarks.getMouth();
+
+          // Calculate more reliable head position using multiple landmarks
+          const leftEyeX = leftEye[0].x;
+          const rightEyeX = rightEye[0].x;
+          const noseX = nose[0].x;
+          const mouthX = mouth[0].x;
+
+          // Eye distance for normalization
+          const eyeDistance = rightEyeX - leftEyeX;
+          
+          // Calculate nose position relative to eyes (0 = far left, 1 = far right)
+          const noseRelativePos = (noseX - leftEyeX) / eyeDistance;
+
+          // Determine head position with adjusted thresholds
+          let currentPosition = 'center';
+          
+          if (noseRelativePos < 0.35) {
+            currentPosition = 'right'; // Looking right
+          } else if (noseRelativePos > 0.65) {
+            currentPosition = 'left'; // Looking left
+          } else {
+            currentPosition = 'center'; // Looking straight
+          }
+
+          setHeadPosition(currentPosition);
+
+          // Track position history
+          positionHistoryRef.current.push(currentPosition);
+          if (positionHistoryRef.current.length > 100) {
+            positionHistoryRef.current.shift();
+          }
+
+          // Check if all required movements have been detected
+          const hasLeftTurn = positionHistoryRef.current.includes('left');
+          const hasRightTurn = positionHistoryRef.current.includes('right');
+          const hasCenterPosition = positionHistoryRef.current.includes('center');
+
+          // Update detection stats
+          setDetectionStats({
+            center: hasCenterPosition,
+            left: hasLeftTurn,
+            right: hasRightTurn
+          });
+
+          // Calculate progress
+          let progress = 0;
+          if (hasCenterPosition) progress += 33;
+          if (hasLeftTurn) progress += 33;
+          if (hasRightTurn) progress += 34;
+
+          setVerificationProgress(progress);
+          
+          // Update status with current detection
+          let statusMsg = `Face detected! `;
+          if (!hasCenterPosition) statusMsg += `Look straight → `;
+          if (!hasLeftTurn) statusMsg += `Turn left → `;
+          if (!hasRightTurn) statusMsg += `Turn right`;
+          statusMsg += ` (${progress}% verified)`;
+          
+          setStatus(statusMsg);
+
+          // Complete verification when all movements detected
+          if (hasLeftTurn && hasRightTurn && hasCenterPosition) {
+            console.log('✓ All head movements detected! Completing verification...');
+            completeVerification();
+          }
+        } else {
+          setFaceDetected(false);
+          setHeadPosition('none');
+          setStatus("Position your face clearly in the circle");
+        }
+      } catch (err) {
+        console.error('Face detection error:', err);
+      }
+    }, 300); // Run detection every 300ms
   };
 
-  // ✅ Complete verification
   const completeVerification = async () => {
-    clearInterval(intervalRef.current);
-    setStatus("Verification Successful");
-
-    if (videoRef.current?.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
-    }
-
     try {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
+
+      setStep(3);
+      setStatus("Verification Complete! ✓");
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
       if (userId) {
         await authAPI.verifyLiveness(userId);
       }
-    } catch (err) {
-      console.error(err);
-    }
 
-    setTimeout(() => {
-      navigate('/dashboard/passenger');
-    }, 2000);
+      setTimeout(() => {
+        navigate('/dashboard/passenger');
+      }, 2000);
+    } catch (err) {
+      console.error('Verification completion error:', err);
+      setError('Verification failed. Please try again.');
+      setStep(2);
+      setVerificationProgress(0);
+      setDetectionStats({ center: false, left: false, right: false });
+      positionHistoryRef.current = [];
+      
+      startFaceDetection();
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center text-white p-6">
-
-      <h2 className="text-2xl font-bold mb-6">Face Verification</h2>
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-white font-sans">
+      <div className="mb-10 text-center">
+        <h2 className="text-3xl font-black tracking-tighter mb-2">Live Identity Verification</h2>
+        <p className="text-gray-500 text-sm italic uppercase tracking-widest">Ensure liveness by moving your head</p>
+      </div>
 
       {error && (
-        <div className="mb-4 text-red-400 flex items-center gap-2">
-          <AlertCircle size={18} /> {error}
+        <div className="mb-6 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-400 text-sm max-w-md text-center flex items-center gap-2">
+          <AlertCircle size={18} />
+          {error}
         </div>
       )}
 
-      <div className="relative w-80 h-80 rounded-full overflow-hidden border-4 border-gray-800">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          className="w-full h-full object-cover"
-        />
-      </div>
+      <canvas ref={canvasRef} style={{ display: 'none' }} width={640} height={480} />
 
-      <div className="mt-6 flex items-center gap-2">
-        {step === 3 ? (
-          <UserCheck className="text-green-500" />
-        ) : (
-          <RefreshCw className="animate-spin" />
+      <div className="relative w-80 h-80 lg:w-[450px] lg:h-[450px] mb-8">
+        <div
+          className={`absolute inset-0 rounded-full border-4 border-dashed transition-all duration-700 ${
+            step === 3
+              ? 'border-[#008751] animate-none'
+              : faceDetected
+              ? 'border-green-500 animate-pulse'
+              : 'border-gray-800 animate-spin-slow'
+          }`}
+        ></div>
+
+        <div className="absolute inset-4 rounded-full overflow-hidden border-2 border-white/10 shadow-[0_0_50px_rgba(0,135,81,0.2)]">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+          />
+        </div>
+
+        {step >= 2 && faceDetected && (
+          <div className="absolute inset-4 rounded-full border-2 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.5)] animate-pulse"></div>
         )}
-        <span>{status}</span>
+
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-[#121212] px-6 py-2 rounded-full border border-gray-800 shadow-2xl flex items-center gap-2">
+          {step === 3 ? (
+            <UserCheck className="text-[#008751]" size={18} />
+          ) : (
+            <RefreshCw
+              className={`${faceDetected ? 'animate-spin text-green-500' : 'text-gray-500'}`}
+              size={18}
+            />
+          )}
+          <span
+            className={`font-bold text-sm ${
+              step === 3 ? 'text-[#008751]' : faceDetected ? 'text-green-400' : 'text-white'
+            }`}
+          >
+            {faceDetected ? 'Face Detected' : 'Waiting...'}
+          </span>
+        </div>
       </div>
 
-      <div className="mt-10 flex gap-4">
+      {step >= 2 && faceDetected && (
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-400 mb-2">Current Head Position:</p>
+          <div className="flex gap-4 justify-center">
+            <div
+              className={`px-4 py-2 rounded-lg border transition-all ${
+                headPosition === 'left'
+                  ? 'bg-[#008751] border-[#008751] text-white'
+                  : 'bg-gray-800 border-gray-700 text-gray-400'
+              }`}
+            >
+              ← LEFT
+            </div>
+            <div
+              className={`px-4 py-2 rounded-lg border transition-all ${
+                headPosition === 'center'
+                  ? 'bg-[#008751] border-[#008751] text-white'
+                  : 'bg-gray-800 border-gray-700 text-gray-400'
+              }`}
+            >
+              → CENTER
+            </div>
+            <div
+              className={`px-4 py-2 rounded-lg border transition-all ${
+                headPosition === 'right'
+                  ? 'bg-[#008751] border-[#008751] text-white'
+                  : 'bg-gray-800 border-gray-700 text-gray-400'
+              }`}
+            >
+              RIGHT ←
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-16 grid grid-cols-4 gap-3">
         {steps.map((s, i) => (
-          <div key={i} className="text-center">
-            <div className={`w-3 h-3 rounded-full mx-auto ${step >= i ? 'bg-green-500' : 'bg-gray-700'}`}></div>
-            <p className="text-xs mt-1">{s}</p>
+          <div key={i} className="flex flex-col items-center gap-2">
+            <div
+              className={`w-3 h-3 rounded-full transition-colors ${
+                step > i ? 'bg-[#008751]' : 'bg-gray-800'
+              }`}
+            ></div>
+            <p
+              className={`text-[9px] font-bold uppercase tracking-widest ${
+                step > i ? 'text-white' : 'text-gray-700'
+              }`}
+            >
+              {s}
+            </p>
           </div>
         ))}
       </div>
 
-      {!faceDetected && (
-        <p className="mt-4 text-gray-400 text-sm">
-          Make sure your face is clearly visible
-        </p>
+      {step === 2 && (
+        <div className="mt-10 w-72 bg-gray-800 rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-[#008751] to-green-500 h-full transition-all duration-300 shadow-[0_0_10px_rgba(0,135,81,0.5)]"
+            style={{ width: `${verificationProgress}%` }}
+          ></div>
+        </div>
+      )}
+
+      <p className="mt-6 text-sm text-gray-400 text-center max-w-md">{status}</p>
+
+      {step === 2 && (
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-500 uppercase tracking-widest mb-3">Required Head Movements:</p>
+          <div className="flex gap-3 justify-center text-xs text-gray-400">
+            <div className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${detectionStats.center ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
+              Look Straight ✓
+            </div>
+            <div className="text-gray-600">•</div>
+            <div className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${detectionStats.left ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
+              Turn Left ✓
+            </div>
+            <div className="text-gray-600">•</div>
+            <div className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${detectionStats.right ? 'bg-[#008751]' : 'bg-gray-600'}`}></div>
+              Turn Right ✓
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
