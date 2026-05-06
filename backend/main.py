@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from database import engine, Base, get_db
 import models, schemas
+import hashlib
 
 load_dotenv()
 
@@ -82,11 +83,16 @@ def startup():
     except Exception as e:
         print(f"✗ Database connection failed: {e}")
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
 def get_password_hash(password):
+    # Hash with SHA256 first to avoid bcrypt 72-byte limit
+    password = hashlib.sha256(password.encode()).hexdigest()
     return pwd_context.hash(password)
+
+
+def verify_password(plain_password, hashed_password):
+    # Apply same SHA256 before verification
+    plain_password = hashlib.sha256(plain_password.encode()).hexdigest()
+    return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
