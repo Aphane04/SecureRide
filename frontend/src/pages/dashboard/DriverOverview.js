@@ -1,11 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-google-maps/api';
+// Changed Marker to MarkerF for React 18 support
+import { GoogleMap, useJsApiLoader, MarkerF, DirectionsRenderer } from '@react-google-maps/api';
 import { Car, CheckCircle, Camera, List, Power, ArrowRight, Settings } from 'lucide-react';
 import { tripAPI, vehicleAPI } from '../../utils/api';
 
+// FIX 1: Move constants outside the component to prevent re-renders
+const libraries = ['places'];
+const center = { lat: -26.2041, lng: 28.0473 };
+
 const DriverOverview = () => {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+  const { isLoaded, loadError } = useJsApiLoader({
+    // FIX 2: HARDCODE YOUR KEY HERE (Paste your AIza... key inside the quotes)
+    googleMapsApiKey: "AIzaSyD-YOUR-ACTUAL-KEY-HERE",
+    libraries: libraries,
   });
 
   const [isOnline, setIsOnline] = useState(false);
@@ -89,17 +96,24 @@ const DriverOverview = () => {
     }
   };
 
-  if (!isLoaded) return null;
+  // Keep your design's loading state
+  if (loadError) return <div className="bg-black h-screen text-red-500 p-10">Map Error: {loadError.message}</div>;
+  if (!isLoaded) return <div className="bg-black h-screen flex items-center justify-center text-green-500 font-bold">LOADING DRIVER INTERFACE...</div>;
 
   return (
     <div className="relative h-[calc(100vh-64px)]">
       <GoogleMap
-        center={{ lat: -26.2041, lng: 28.0473 }}
+        center={center}
         zoom={14}
         mapContainerStyle={{ width: '100%', height: '100%' }}
         options={{ disableDefaultUI: true }}
       >
-        {directions ? <DirectionsRenderer directions={directions} /> : <Marker position={{ lat: -26.2041, lng: 28.0473 }} />}
+        {directions ? (
+          <DirectionsRenderer directions={directions} />
+        ) : (
+          /* FIX 3: Use MarkerF to ensure the pin displays in React 18 */
+          <MarkerF position={center} />
+        )}
       </GoogleMap>
 
       {activeTrip && (
@@ -108,6 +122,7 @@ const DriverOverview = () => {
         </div>
       )}
 
+      {/* Driver Controls Overlay */}
       <div className="absolute top-6 left-6 flex items-center gap-4 z-10">
         <button
           onClick={() => setIsOnline(!isOnline)}
@@ -130,6 +145,7 @@ const DriverOverview = () => {
         <Settings className="text-gray-600 hover:text-white cursor-pointer" size={18} />
       </div>
 
+      {/* Ride Requests Sidebar */}
       <div className="absolute bottom-8 left-8 right-8 lg:left-auto lg:right-10 lg:w-[450px]">
         <div className="bg-[#121212]/95 backdrop-blur-2xl p-8 rounded-[40px] border border-gray-800 shadow-2xl">
           <div className="flex items-center justify-between mb-8">
@@ -171,6 +187,7 @@ const DriverOverview = () => {
         </div>
       </div>
 
+      {/* Vehicle Registration Modal */}
       {showVehicleForm && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50 backdrop-blur-md">
           <div className="bg-[#121212] w-full max-w-lg p-10 rounded-[40px] border border-gray-800 shadow-2xl">
@@ -204,8 +221,8 @@ const DriverOverview = () => {
               </label>
 
               <div className="flex gap-4 mt-8">
-                <button onClick={submitVehicle} className="flex-1 bg-[#008751] py-4 rounded-2xl font-bold">Submit</button>
-                <button onClick={() => setShowVehicleForm(false)} className="flex-1 bg-gray-800 py-4 rounded-2xl font-bold">Cancel</button>
+                <button onClick={submitVehicle} className="flex-1 bg-[#008751] py-4 rounded-2xl font-bold transition">Submit</button>
+                <button onClick={() => setShowVehicleForm(false)} className="flex-1 bg-gray-800 py-4 rounded-2xl font-bold transition">Cancel</button>
               </div>
             </div>
           </div>
