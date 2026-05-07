@@ -203,21 +203,20 @@ def upload_id_document(user_id: int, file: UploadFile = File(...), db: Session =
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if file.content_type not in ALLOWED_MIME_TO_EXT:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
-
-    ext = ALLOWED_MIME_TO_EXT[file.content_type]
+    # 1. Save the actual file
+    ext = ALLOWED_MIME_TO_EXT.get(file.content_type, "jpg")
     filename = f"{uuid.uuid4()}.{ext}"
     file_path = os.path.join(UPLOAD_DIR, filename)
     
     with open(file_path, "wb") as f:
         f.write(file.file.read())
 
-    # SAVE THE PATH TO THE PROFILE so the admin can see it
+    # 2. Update the Profile record with the new URL
     profile = db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
     if profile:
         profile.id_photo_url = f"/uploads/id_documents/{filename}"
-        db.commit()
+        db.commit() # Save to DB
+        print(f"✅ Saved ID path for {user.email}: {profile.id_photo_url}")
 
     return {"message": "ID uploaded", "file": f"/uploads/id_documents/{filename}"}
 
@@ -444,10 +443,9 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
         for trip, email in rows
     ]
 
-@app.get("/admin/drivers")
+@app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
 def admin_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
-    # Join User, Profile, and Vehicle to get the full picture
     rows = (
         db.query(models.User, models.Profile, models.Vehicle)
         .join(models.Profile, models.User.id == models.Profile.user_id)
@@ -459,26 +457,22 @@ def admin_drivers(user: models.User = Depends(get_current_user), db: Session = D
         {
             "id": u.id,
             "email": u.email,
-            "is_verified": u.is_verified,
             "full_name": p.full_name,
+            "role": u.role,
+            "is_verified": u.is_verified,
             "phone": p.phone,
             "id_number": p.id_number,
             "address": p.physical_address,
             "dob": p.dob,
             "gender": p.gender,
             "ethnicity": p.ethnicity,
-            "id_photo_url": getattr(p, 'id_photo_url', None),
-            # Vehicle info
-            "vehicle": {
-                "make_model": v.make_model if v else "Not Registered",
-                "plate_number": v.plate_number if v else "N/A",
-                "photo_url": v.photo_url if v else None
-            } if v else None
+            "id_photo_url": p.id_photo_url,
+            "vehicle": v # This will match the VehicleOut schema automatically
         }
         for u, p, v in rows
     ]
 
-@app.get("/admin/passengers") # Remove response_model if it restricts fields
+@app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
 def admin_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     rows = (
@@ -491,15 +485,16 @@ def admin_passengers(user: models.User = Depends(get_current_user), db: Session 
         {
             "id": u.id,
             "email": u.email,
-            "is_verified": u.is_verified,
             "full_name": p.full_name,
+            "role": u.role,
+            "is_verified": u.is_verified,
             "phone": p.phone,
             "id_number": p.id_number,
             "address": p.physical_address,
-            "ethnicity": p.ethnicity,
             "dob": p.dob,
             "gender": p.gender,
-            "id_photo_url": getattr(p, 'id_photo_url', None) # Assumes you added this to models.py
+            "ethnicity": p.ethnicity,
+            "id_photo_url": p.id_photo_url
         }
         for u, p in rows
     ]

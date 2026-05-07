@@ -25,6 +25,9 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column("physical_address", String(255))
+    # --- ADD THIS LINE BELOW ---
+    id_photo_url = Column(String(255), nullable=True) 
+    # ---------------------------
     user = relationship("User", back_populates="profile")
 
 class Passenger(Base):

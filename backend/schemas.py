@@ -114,12 +114,27 @@ class AdminTripOut(BaseModel):
     status: str
     start_time: datetime
 
+# --- Update this section in your schemas.py ---
+
 class AdminUserOut(BaseModel):
     id: int
     email: str
     full_name: str
     role: str
     is_verified: bool
+    # ADD THESE FIELDS BELOW:
+    phone: Optional[str] = None
+    id_number: Optional[str] = None
+    address: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    ethnicity: Optional[str] = None
+    id_photo_url: Optional[str] = None
+    # This allows the Admin to see vehicle info when looking at a driver
+    vehicle: Optional[VehicleOut] = None 
+
+    class Config:
+        from_attributes = True
 
 class AdminAlertOut(BaseModel):
     id: int
