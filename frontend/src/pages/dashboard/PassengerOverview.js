@@ -1,28 +1,20 @@
 import React from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 
-// FIX 1: Move libraries OUTSIDE the component to stop the infinite reloading loop
-const libraries = ['places']; 
+// Keep your original center coordinates
 const center = { lat: -26.2041, lng: 28.0473 };
+
+// Technical fix: Move this outside to stop the infinite loop error
+const libraries = ['places']; 
 
 const PassengerOverview = () => {
   const { isLoaded, loadError } = useJsApiLoader({
-    // FIX 2: If this still fails, replace the process.env line below 
-    // with your actual key string "AIza..." just to test it.
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+    // REPLACE WITH YOUR KEY: This fixes the "NoApiKeys" error
+    googleMapsApiKey: "AIzaSyA83A7s1BCXBGOXnNAR362CkdeLPKYkGDQ", 
     libraries: libraries,
   });
 
-  // Add an error catch so you can see exactly what's wrong in the UI
-  if (loadError) {
-    return (
-      <div className="bg-black h-screen flex flex-col items-center justify-center text-red-500 p-4">
-        <h1 className="text-xl font-bold">Map Load Error</h1>
-        <p>{loadError.message}</p>
-      </div>
-    );
-  }
-
+  // Keep your original loading screen design
   if (!isLoaded) {
     return (
       <div className="bg-black h-screen flex items-center justify-center text-green-500">
@@ -31,20 +23,25 @@ const PassengerOverview = () => {
     );
   }
 
+  // If there is an error, show it (helps with debugging)
+  if (loadError) {
+    return (
+      <div className="bg-black h-screen flex items-center justify-center text-red-500">
+        Error loading maps...
+      </div>
+    );
+  }
+
   return (
+    // Keep your original height and layout
     <div className="h-[calc(100vh-64px)]">
       <GoogleMap
         center={center}
         zoom={15}
         mapContainerStyle={{ width: '100%', height: '100%' }}
-        options={{ 
-          disableDefaultUI: true,
-          // This ID is required for the new "Advanced Markers" 
-          // You can create a Map ID in Google Console or leave it out for now
-          mapId: 'DEMO_MAP_ID' 
-        }}
+        options={{ disableDefaultUI: true }}
       >
-        {/* FIX 3: Use MarkerF (F for Functional) instead of Marker to solve React 18 compatibility */}
+        {/* Use MarkerF to ensure the pin shows up in React 18 */}
         <MarkerF position={center} />
       </GoogleMap>
     </div>
