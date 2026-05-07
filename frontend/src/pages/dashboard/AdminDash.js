@@ -1,78 +1,144 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, Users, ShieldAlert, Car, LogOut, 
-  Settings, Bell, Search, User
+  LayoutDashboard, 
+  Users, 
+  ShieldAlert, 
+  Car, 
+  LogOut, 
+  Settings,
+  Bell,
+  Search,
+  ChevronRight
 } from 'lucide-react';
 
 const AdminDash = () => {
   const navigate = useNavigate();
 
+  // Pure black and emerald green styling for the sidebar
   const navLinkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-6 py-4 text-sm font-medium transition-all ${
+    `flex items-center justify-between px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
       isActive 
-        ? 'bg-green-600 text-white shadow-lg' 
-        : 'text-gray-400 hover:bg-white/5 hover:text-white'
+        ? 'bg-green-600 text-white shadow-[0_0_20px_rgba(34,197,94,0.3)] border-r-4 border-white' 
+        : 'text-gray-500 hover:bg-white/5 hover:text-white'
     }`;
 
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate('/login');
+  };
+
   return (
-    <div className="min-h-screen bg-[#f4f7fe] flex font-sans">
-      {/* SIDEBAR: Inspired by the image sidebar */}
-      <div className="w-72 bg-[#1a1f37] text-white flex flex-col shadow-2xl z-20">
-        <div className="p-8 flex items-center gap-3">
-          <div className="bg-green-500 p-1.5 rounded-lg">
+    <div className="min-h-screen bg-[#f8f9fa] flex font-sans">
+      
+      {/* SIDEBAR: Pure Black & Professional */}
+      <div className="w-72 bg-black text-white flex flex-col shadow-2xl z-20 relative">
+        <div className="p-10 flex items-center gap-3">
+          <div className="bg-green-500 p-1.5 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
             <ShieldAlert size={20} className="text-white" />
           </div>
           <span className="text-xl font-black tracking-tighter uppercase">SecureRide</span>
         </div>
 
         <nav className="flex-1 mt-4">
-          <div className="px-8 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Main Menu</div>
-          <NavLink to="/dashboard/admin" end className={navLinkClass}><LayoutDashboard size={18}/> Dashboard</NavLink>
-          <NavLink to="drivers" className={navLinkClass}><Car size={18}/> Drivers</NavLink>
-          <NavLink to="passengers" className={navLinkClass}><Users size={18}/> Student Work</NavLink>
-          <NavLink to="alerts" className={navLinkClass}><ShieldAlert size={18}/> Alert Center</NavLink>
-          <NavLink to="settings" className={navLinkClass}><Settings size={18}/> Settings</NavLink>
+          <div className="px-10 py-4 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em]">Administrative</div>
+          
+          <NavLink to="/dashboard/admin" end className={navLinkClass}>
+            <div className="flex items-center gap-4">
+                <LayoutDashboard size={18}/> <span>Dashboard</span>
+            </div>
+            <ChevronRight size={12} />
+          </NavLink>
+
+          <NavLink to="drivers" className={navLinkClass}>
+            <div className="flex items-center gap-4">
+                <Car size={18}/> <span>Drivers</span>
+            </div>
+            <ChevronRight size={12} />
+          </NavLink>
+
+          {/* Corrected label from "Student Work" to "Passengers" */}
+          <NavLink to="passengers" className={navLinkClass}>
+            <div className="flex items-center gap-4">
+                <Users size={18}/> <span>Passengers</span>
+            </div>
+            <ChevronRight size={12} />
+          </NavLink>
+
+          <NavLink to="alerts" className={navLinkClass}>
+            <div className="flex items-center gap-4">
+                <ShieldAlert size={18}/> <span>Safety Center</span>
+            </div>
+            <ChevronRight size={12} />
+          </NavLink>
+
+          <div className="px-10 py-8 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em]">System</div>
+          
+          <NavLink to="settings" className={navLinkClass}>
+            <div className="flex items-center gap-4">
+                <Settings size={18}/> <span>Settings</span>
+            </div>
+            <ChevronRight size={12} />
+          </NavLink>
         </nav>
 
-        <div className="p-8 border-t border-white/5">
+        {/* Logout at bottom */}
+        <div className="p-10 border-t border-white/5">
           <button 
-            onClick={() => { localStorage.clear(); navigate('/login'); }}
-            className="flex items-center gap-3 text-red-400 font-bold text-sm hover:text-red-300 transition"
+            onClick={handleLogout}
+            className="flex items-center gap-3 text-red-500 font-black text-[10px] uppercase tracking-widest hover:text-red-400 transition group"
           >
-            <LogOut size={18}/> Logout
+            <LogOut size={18} className="group-hover:-translate-x-1 transition-transform"/> Logout System
           </button>
         </div>
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#f4f7fe]">
-        {/* Top Header from the image */}
-        <header className="h-20 bg-transparent flex items-center justify-between px-10">
-          <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        
+        {/* Top Navbar: Premium White/Black Mix */}
+        <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-12 z-10">
+          <div className="flex items-center gap-4 bg-gray-50 px-5 py-2.5 rounded-2xl border border-gray-100">
             <Search size={16} className="text-gray-400" />
-            <input type="text" placeholder="Global search..." className="bg-transparent border-none outline-none text-sm text-gray-600 w-64" />
+            <input 
+                type="text" 
+                placeholder="Search global records..." 
+                className="bg-transparent border-none outline-none text-xs text-gray-600 w-64 font-medium" 
+            />
           </div>
 
-          <div className="flex items-center gap-6">
-            <Bell size={20} className="text-gray-400 cursor-pointer" />
-            <div className="flex items-center gap-3 border-l pl-6 border-gray-200">
+          <div className="flex items-center gap-8">
+            <div className="relative cursor-pointer group">
+                <Bell size={20} className="text-gray-400 group-hover:text-black transition-colors" />
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+            </div>
+
+            <div className="flex items-center gap-4 border-l pl-8 border-gray-100">
                <div className="text-right">
-                 <p className="text-sm font-bold text-[#1a1f37]">Root Admin</p>
-                 <p className="text-[10px] text-gray-400 font-medium">Super User</p>
+                 <p className="text-xs font-black text-black uppercase tracking-tighter">Root Admin</p>
+                 <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Super User</p>
                </div>
-               <div className="w-10 h-10 bg-[#1a1f37] rounded-full flex items-center justify-center text-white font-bold text-xs">
+               <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-black text-xs shadow-lg border-2 border-green-500">
                  RA
                </div>
             </div>
           </div>
         </header>
 
-        {/* Dynamic Page Content */}
-        <main className="flex-1 overflow-y-auto p-10 pt-4">
-          <Outlet />
+        {/* Page Content: Gray background for the floating white table effect */}
+        <main className="flex-1 overflow-y-auto bg-[#f8f9fa] custom-scrollbar">
+          <div className="p-12">
+            <Outlet />
+          </div>
         </main>
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #008751; }
+      `}</style>
     </div>
   );
 };
