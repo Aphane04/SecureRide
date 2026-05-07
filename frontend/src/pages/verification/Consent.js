@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authAPI } from '../../utils/api';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Shield } from 'lucide-react';
 
 const Consent = () => {
   const navigate = useNavigate();
@@ -23,107 +23,114 @@ const Consent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0c10] font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0a0a] font-sans relative">
       
-      {/* Background Ambient Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[#008751] opacity-20 blur-[120px] rounded-full" />
-      </div>
-
-      {/* Header Navigation */}
-      <nav className="relative z-10 flex items-center justify-between px-10 py-6 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(-1)}>
-          <ChevronLeft className="text-gray-400" size={20} />
-          <span className="text-gray-400 text-sm font-medium">Back</span>
+      {/* 1. Static Dark Header */}
+      <nav className="relative z-10 flex items-center justify-between px-10 py-8 max-w-7xl mx-auto">
+        <div className="flex items-center gap-2 cursor-pointer group" onClick={() => navigate(-1)}>
+          <ChevronLeft className="text-gray-500 group-hover:text-white transition-colors" size={20} />
+          <span className="text-gray-500 group-hover:text-white text-sm font-medium transition-colors">Back to Register</span>
         </div>
-        <div className="flex gap-8 text-gray-400 text-sm font-medium">
-          <span className="hover:text-white cursor-pointer transition-colors">Home</span>
-          <span className="hover:text-white cursor-pointer transition-colors">Safety</span>
-          <span className="hover:text-white cursor-pointer transition-colors">Contact</span>
+        <div className="flex items-center gap-2">
+            <Shield className="text-[#008751]" size={20} />
+            <span className="text-white font-black tracking-tighter uppercase text-sm">SecureRide Compliance</span>
         </div>
-        <button className="bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full text-xs font-bold transition-all border border-white/10 backdrop-blur-md">
-          Help Center
-        </button>
       </nav>
 
-      {/* Top Title Section */}
-      <div className="relative z-10 text-center pt-20 pb-24">
-        <h1 className="text-5xl font-bold text-white tracking-tight mb-4">
+      {/* 2. Page Title */}
+      <div className="relative z-10 text-center pt-12 pb-20">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4">
           Consent Form and Policy
         </h1>
-        <p className="text-gray-500 text-sm font-medium">
-          Last updated on May 07, 2026
+        <p className="text-gray-500 text-xs font-bold uppercase tracking-[0.3em]">
+          Legal Framework • Data Privacy • Safety Standards
         </p>
       </div>
 
-      {/* Main Document Body (White Content Area) */}
-      <div className="relative z-10 bg-white rounded-t-[4rem] min-h-screen shadow-[0_-20px_80px_rgba(0,0,0,0.4)]">
-        <div className="max-w-3xl mx-auto px-8 py-20 text-[#333] leading-relaxed">
+      {/* 3. The White Document Area */}
+      <div className="relative z-10 bg-white rounded-t-[3rem] md:rounded-t-[5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+        <div className="max-w-3xl mx-auto px-8 py-20 text-[#1a1a1a]">
           
-          <p className="text-sm text-gray-500 mb-12">
-            SecureRide is dedicated to protecting your personal information and respecting your privacy. This Document outlines the types of biometric and trip data we collect, how we use it, and your legal rights regarding that information. By accessing or using our Services, you agree to the practices described in this Consent Form and Policy.
-          </p>
+          <div className="mb-16 pb-8 border-b border-gray-100">
+            <p className="text-sm text-gray-500 leading-relaxed italic">
+              "By using the SecureRide platform, you acknowledge that our AI-driven safety systems require the collection of specific biometric and environmental data to function. This document serves as your formal consent to these processes."
+            </p>
+          </div>
 
-          <h2 className="text-3xl font-bold text-black mb-6">Information We Collect</h2>
-          <p className="text-sm text-gray-600 mb-8">We collect different types of personal and safety information depending on your role within the platform.</p>
-
-          <div className="space-y-12">
+          <div className="space-y-16">
             {/* Section 1 */}
             <section>
-              <h3 className="text-xl font-bold text-black mb-4">1. Personal Information You Provide to Us</h3>
-              <p className="text-sm text-gray-600 mb-4">We may collect the following types of information that you voluntarily provide:</p>
-              <ul className="list-disc pl-6 space-y-3 text-sm text-gray-600">
-                <li><strong>Account Information:</strong> When you register, we collect your full name, ID number, ethnicity, and gender to build your secure profile.</li>
-                <li><strong>Contact Information:</strong> We store your mobile number and email to facilitate ride coordination and emergency notifications.</li>
-                <li><strong>Biometric Data:</strong> During registration, a live 3D face scan is required to confirm identity and prevent account spoofing.</li>
-                <li><strong>Emergency Contacts:</strong> Drivers and Passengers provide secondary contact details for automated safety protocols.</li>
-              </ul>
+              <h2 className="text-2xl font-black text-black mb-6 flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-[#008751] rounded-full" />
+                Information We Collect
+              </h2>
+              <div className="space-y-6 text-sm text-gray-600 leading-relaxed">
+                <p>
+                  <strong>1. Biometric Identity:</strong> To ensure the highest level of security, we collect a high-resolution 3D facial map. This is used only to verify that the person accessing the account matches the legal identity documents provided.
+                </p>
+                <p>
+                  <strong>2. Identity Documentation:</strong> We require images of Government-issued IDs. These are stored using AES-256 encryption and are accessible only by authorized security personnel during verification audits.
+                </p>
+              </div>
             </section>
 
             {/* Section 2 */}
             <section>
-              <h3 className="text-xl font-bold text-black mb-4">2. Information Collected Automatically</h3>
-              <p className="text-sm text-gray-600 mb-4">During active trips, our AI safety infrastructure collects data automatically:</p>
-              <ul className="list-disc pl-6 space-y-3 text-sm text-gray-600">
-                <li><strong>AI Audio Monitoring:</strong> Our safety model monitors audio signals in real-time to detect keywords indicating distress, violence, or danger.</li>
-                <li><strong>GPS Location Data:</strong> Precise location tracking is active for the duration of every trip for passenger and driver security.</li>
-                <li><strong>Device Information:</strong> Details about the mobile device used to access the service to ensure session integrity.</li>
-              </ul>
+              <h2 className="text-2xl font-black text-black mb-6 flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-[#008751] rounded-full" />
+                AI Monitoring & Safety
+              </h2>
+              <div className="space-y-6 text-sm text-gray-600 leading-relaxed">
+                <p>
+                  SecureRide utilizes a proprietary <strong>AI Safety Monitor</strong>. During an active trip, the system analyzes ambient audio signals to detect "Danger Keywords" (e.g., help, stop, weapon). 
+                </p>
+                <ul className="space-y-4 pl-4 border-l-2 border-green-50">
+                    <li><span className="text-[#008751] font-bold">●</span> Real-time GPS tracking is mandatory for all active trips.</li>
+                    <li><span className="text-[#008751] font-bold">●</span> Audio analysis is processed locally and discarded unless a safety alert is triggered.</li>
+                    <li><span className="text-[#008751] font-bold">●</span> Metadata regarding trip duration and route is stored for user trip history.</li>
+                </ul>
+              </div>
             </section>
 
             {/* Section 3 */}
             <section>
-              <h3 className="text-xl font-bold text-black mb-4">How We Use Your Information</h3>
-              <p className="text-sm text-gray-600 mb-4">We process the collected information to enhance safety and ensure the smooth functioning of our services:</p>
-              <ul className="list-disc pl-6 space-y-3 text-sm text-gray-600">
-                <li><strong>Identity Verification:</strong> Using biometric hashes to ensure the person behind the wheel or in the car is the authorized account holder.</li>
-                <li><strong>Safety Intervention:</strong> Automatically alerting emergency services and law enforcement if the AI Monitor flags a critical safety violation.</li>
-                <li><strong>Legal Compliance:</strong> Ensuring all operations adhere to local transport regulations and data protection acts (POPIA/GDPR).</li>
-                <li><strong>Conflict Resolution:</strong> Reviewing AI transcripts and GPS logs to settle disputes or investigate reported incidents.</li>
-              </ul>
-            </section>
-
-            {/* Section 4 */}
-            <section>
-              <h3 className="text-xl font-bold text-black mb-4">Third Party Sharing</h3>
-              <p className="text-sm text-gray-600">
-                Your data is never sold to advertisers. Information is only shared with verified Law Enforcement Agencies (LEA) and your designated Emergency Contacts in the event of a high-severity safety alert.
-              </p>
+              <h2 className="text-2xl font-black text-black mb-6 flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-[#008751] rounded-full" />
+                Agreements & Conduct
+              </h2>
+              <div className="text-sm text-gray-600 leading-relaxed">
+                <p>
+                  Users agree to maintain professional conduct. Drivers must maintain valid licenses and vehicle insurance. Passengers agree to adhere to safety guidelines. Any violation of these rules, detected by AI or reported manually, may lead to immediate account suspension and legal review.
+                </p>
+              </div>
             </section>
           </div>
 
-          {/* Action Button Section */}
-          <div className="mt-20 pt-10 border-t border-gray-100 flex flex-col items-center">
-            <p className="text-xs text-gray-400 mb-6 text-center max-w-md">
-              By clicking "Confirm & Accept", you provide explicit consent for biometric processing and AI trip monitoring as described above.
-            </p>
+          {/* 4. Action Section (Button changed from Blue to Green) */}
+          <div className="mt-24 pt-12 border-t border-gray-100 flex flex-col items-center">
+            <div className="mb-8 text-center">
+                <p className="text-xs font-bold text-[#008751] uppercase tracking-widest mb-2">Final Confirmation</p>
+                <p className="text-sm text-gray-400 max-w-sm">
+                    Clicking the button below confirms your agreement to the SecureRide Data & Safety Policy.
+                </p>
+            </div>
+            
             <button 
               onClick={handleConsent}
               disabled={loading}
-              className="w-full max-w-sm bg-black hover:bg-[#008751] text-white py-4 rounded-xl font-bold text-sm transition-all shadow-xl active:scale-[0.98] disabled:opacity-50"
+              className="w-full max-w-md bg-[#1a1a1a] hover:bg-[#008751] text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-[0.98] disabled:opacity-50"
             >
-              {loading ? "PROCESSING..." : "CONFIRM & ACCEPT"}
+              {loading ? (
+                <div className="flex items-center justify-center gap-3">
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    Saving Consent...
+                </div>
+              ) : "I Agree and Continue"}
             </button>
+            
+            <p className="mt-8 text-[10px] text-gray-300 font-medium uppercase tracking-tighter">
+                SecureRide Terminal • Document ID: {userId || 'NEW_USER'} • v2026.01
+            </p>
           </div>
 
         </div>
