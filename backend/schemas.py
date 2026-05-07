@@ -2,12 +2,10 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
-# 1. Authentication Schemas
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-# 2. User & Profile Base Schemas
 class UserCreate(BaseModel):
     email: EmailStr
     full_name: str
@@ -45,7 +43,6 @@ class UserProfileOut(BaseModel):
     id_number: Optional[str]
     is_verified: bool
 
-# 3. Vehicle Schema (Defined here so Admin schemas can use it)
 class VehicleOut(BaseModel):
     id: int
     make_model: str
@@ -54,7 +51,6 @@ class VehicleOut(BaseModel):
     class Config:
         from_attributes = True
 
-# 4. Admin Intelligence Schemas
 class AdminUserOut(BaseModel):
     id: int
     email: str
@@ -93,7 +89,6 @@ class AdminAlertOut(BaseModel):
     transcript: str
     detected_at: datetime
 
-# 5. Emergency Contacts (Both Input and Output)
 class EmergencyContactCreate(BaseModel):
     name: str
     phone: str
@@ -106,17 +101,6 @@ class EmergencyContactOut(BaseModel):
     relationship_type: Optional[str] = None
     class Config:
         from_attributes = True
-
-# 6. Trip Logistics Schemas
-class TripEstimateRequest(BaseModel):
-    pickup_location: str
-    destination: str
-    distance_km: float
-    duration_minutes: float
-
-class TripEstimateResponse(BaseModel):
-    estimated_fare: float
-    payment_method: str
 
 class TripCreate(BaseModel):
     pickup_location: str
@@ -137,16 +121,3 @@ class TripOut(BaseModel):
     payment_method: str
     class Config:
         from_attributes = True
-
-# 7. Safety & Update Schemas
-class EmergencyAlert(BaseModel):
-    transcript: str
-
-class ProfileUpdate(BaseModel):
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    dob: Optional[str] = None
-    gender: Optional[str] = None
-    id_number: Optional[str] = None
-    email: Optional[EmailStr] = None
