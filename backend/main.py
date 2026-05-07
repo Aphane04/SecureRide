@@ -9,12 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy import or_  # Ensure this is with your other imports
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 
 from database import engine, Base, get_db
 import models, schemas
+import base64
 
 load_dotenv()
 
@@ -203,22 +205,18 @@ def upload_id_document(user_id: int, file: UploadFile = File(...), db: Session =
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 1. Save the actual file
-    ext = ALLOWED_MIME_TO_EXT.get(file.content_type, "jpg")
-    filename = f"{uuid.uuid4()}.{ext}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    
-    with open(file_path, "wb") as f:
-        f.write(file.file.read())
+    # Read file and convert to Base64 string
+    file_data = file.file.read()
+    base64_str = base64.b64encode(file_data).decode('utf-8')
+    data_uri = f"data:{file.content_type};base64,{base64_str}"
 
-    # 2. Update the Profile record with the new URL
+    # Save to database
     profile = db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
     if profile:
-        profile.id_photo_url = f"/uploads/id_documents/{filename}"
-        db.commit() # Save to DB
-        print(f"✅ Saved ID path for {user.email}: {profile.id_photo_url}")
+        profile.id_photo_url = data_uri
+        db.commit()
 
-    return {"message": "ID uploaded", "file": f"/uploads/id_documents/{filename}"}
+    return {"message": "ID uploaded and secured in database"}
 
 
 @app.post("/auth/verify-liveness/{user_id}")
