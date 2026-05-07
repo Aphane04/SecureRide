@@ -10,22 +10,14 @@ const Consent = () => {
   const [loading, setLoading] = useState(false);
 
   const handleConsent = async () => {
-    if (!userId) return alert("Session expired. Please register again.");
-    setLoading(true);
-    try {
-      // 1. Record the legal consent in the backend
-      await authAPI.recordConsent(userId);
-      
-      // 2. REDIRECT TO FACE SCAN PAGE
-      // We pass the userId in the 'state' so the FaceScan component can access it
-      navigate('/verify/face-scan', { state: { userId } }); 
-      
-    } catch (err) {
-      console.error("Consent Error:", err);
-      alert(err.response?.data?.detail || "Consent recording failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    if (!userId) return alert("User ID missing. Please register again.");
+    
+    // We try to tell the backend, but we don't WAIT for it.
+    // This ensures the user always goes to the next page.
+    authAPI.recordConsent(userId).catch(err => console.log("Backend sync failed, but continuing..."));
+    
+    // GO TO FACE SCAN IMMEDIATELY
+    navigate('/verify/face-scan', { state: { userId } });
   };
 
   return (
