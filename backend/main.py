@@ -206,18 +206,21 @@ def upload_id_document(user_id: int, file: UploadFile = File(...), db: Session =
     if file.content_type not in ALLOWED_MIME_TO_EXT:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
-    data = file.file.read()
-    if len(data) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(status_code=400, detail="File too large")
-
     ext = ALLOWED_MIME_TO_EXT[file.content_type]
     filename = f"{uuid.uuid4()}.{ext}"
     file_path = os.path.join(UPLOAD_DIR, filename)
-
+    
     with open(file_path, "wb") as f:
-        f.write(data)
+        f.write(file.file.read())
+
+    # SAVE THE PATH TO THE PROFILE so the admin can see it
+    profile = db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
+    if profile:
+        profile.id_photo_url = f"/uploads/id_documents/{filename}"
+        db.commit()
 
     return {"message": "ID uploaded", "file": f"/uploads/id_documents/{filename}"}
+
 
 @app.post("/auth/verify-liveness/{user_id}")
 def verify_liveness(user_id: int, db: Session = Depends(get_db)):
@@ -461,7 +464,7 @@ def admin_drivers(user: models.User = Depends(get_current_user), db: Session = D
         for u, p in rows
     ]
 
-@app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
+@app.get("/admin/passengers") # Remove response_model if it restricts fields
 def admin_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     rows = (
@@ -474,9 +477,15 @@ def admin_passengers(user: models.User = Depends(get_current_user), db: Session 
         {
             "id": u.id,
             "email": u.email,
+            "is_verified": u.is_verified,
             "full_name": p.full_name,
-            "role": u.role,
-            "is_verified": u.is_verified
+            "phone": p.phone,
+            "id_number": p.id_number,
+            "address": p.physical_address,
+            "ethnicity": p.ethnicity,
+            "dob": p.dob,
+            "gender": p.gender,
+            "id_photo_url": getattr(p, 'id_photo_url', None) # Assumes you added this to models.py
         }
         for u, p in rows
     ]
