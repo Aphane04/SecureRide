@@ -231,13 +231,31 @@ def list_contacts(user: models.User = Depends(get_current_user), db: Session = D
 # --- Vehicle (Base64) ---
 
 @app.post("/vehicles/register", response_model=schemas.VehicleOut)
-def register_vehicle(make_model: str = Form(...), plate_number: str = Form(...), photo: UploadFile = File(None), user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def register_vehicle(
+    make_model: str = Form(...), 
+    plate_number: str = Form(...), 
+    photo: UploadFile = File(None), 
+    user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    # --- ADD THIS SECURITY CHECK ---
+    if user.role != "Driver":
+        raise HTTPException(status_code=403, detail="Only drivers can register vehicles.")
+    # -------------------------------
+
     photo_uri = None
     if photo:
         content = photo.file.read()
+        # This line requires 'import base64' at the top
         photo_uri = f"data:{photo.content_type};base64,{base64.b64encode(content).decode('utf-8')}"
 
-    vehicle = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=photo_uri)
+    # Ensure this matches your singular model name "Vehicle"
+    vehicle = models.Vehicle(
+        driver_id=user.id, 
+        make_model=make_model, 
+        plate_number=plate_number, 
+        photo_url=photo_uri
+    )
     db.add(vehicle)
     db.commit()
     db.refresh(vehicle)
