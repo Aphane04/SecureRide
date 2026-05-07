@@ -2,7 +2,16 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
-# 1. Basic User Schemas
+# --- Vehicle ---
+class VehicleOut(BaseModel):
+    id: int
+    make_model: str
+    plate_number: str
+    photo_url: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+# --- User Base ---
 class UserCreate(BaseModel):
     email: EmailStr
     full_name: str
@@ -40,17 +49,7 @@ class UserProfileOut(BaseModel):
     id_number: Optional[str]
     is_verified: bool
 
-# 2. Vehicle Schema (MOVED UP HERE TO FIX THE ERROR)
-class VehicleOut(BaseModel):
-    id: int
-    make_model: str
-    plate_number: str
-    photo_url: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-# 3. Admin Schemas (Now they can see VehicleOut safely)
+# --- Admin Specific ---
 class AdminUserOut(BaseModel):
     id: int
     email: str
@@ -64,8 +63,7 @@ class AdminUserOut(BaseModel):
     gender: Optional[str] = None
     ethnicity: Optional[str] = None
     id_photo_url: Optional[str] = None
-    vehicle: Optional[VehicleOut] = None # Now it knows what VehicleOut is
-
+    vehicle: Optional[VehicleOut] = None 
     class Config:
         from_attributes = True
 
@@ -90,23 +88,7 @@ class AdminAlertOut(BaseModel):
     transcript: str
     detected_at: datetime
 
-# 4. Other Schemas
-class ProfileUpdate(BaseModel):
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    dob: Optional[str] = None
-    gender: Optional[str] = None
-    id_number: Optional[str] = None
-    email: Optional[EmailStr] = None
-
-class EmergencyAlert(BaseModel):
-    transcript: str
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
+# --- Emergency Contacts ---
 class EmergencyContactCreate(BaseModel):
     name: str
     phone: str
@@ -120,23 +102,7 @@ class EmergencyContactOut(BaseModel):
     class Config:
         from_attributes = True
 
-class TripEstimateRequest(BaseModel):
-    pickup_location: str
-    destination: str
-    distance_km: float
-    duration_minutes: float
-
-class TripEstimateResponse(BaseModel):
-    estimated_fare: float
-    payment_method: str
-
-class TripCreate(BaseModel):
-    pickup_location: str
-    destination: str
-    distance_km: float
-    duration_minutes: float
-    fare: float
-
+# --- Trips ---
 class TripOut(BaseModel):
     id: int
     pickup_location: str
