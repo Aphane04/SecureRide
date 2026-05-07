@@ -276,32 +276,23 @@ def trip_history(user: models.User = Depends(get_current_user), db: Session = De
         raise HTTPException(status_code=403, detail="Only passengers can view trip history.")
     return db.query(models.Trip).filter(models.Trip.passenger_id == user.id).order_by(models.Trip.start_time.desc()).all()
 
+from sqlalchemy import or_
+
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def trip_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 1. Verification Check: Ensure the user is actually a Driver
     if user.role != "Driver":
+        print(f"❌ User {user.email} is not a driver. Role is: {user.role}")
         raise HTTPException(status_code=403, detail="Only drivers can view ride requests.")
-    return db.query(models.Trip).filter(
+
+    # 2. Query: Look for 'Searching' trips where driver_id is NULL or empty
+    requests = db.query(models.Trip).filter(
         models.Trip.status == "Searching",
-        models.Trip.driver_id.is_(None)
+        or_(models.Trip.driver_id == None, models.Trip.driver_id == 0)
     ).order_by(models.Trip.start_time.desc()).all()
-
-@app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
-def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if user.role != "Driver":
-        raise HTTPException(status_code=403, detail="Only drivers can accept rides.")
-    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
-    if trip.driver_id:
-        raise HTTPException(status_code=400, detail="Trip already accepted")
-    if trip.status != "Searching":
-        raise HTTPException(status_code=400, detail="Trip is not available")
-
-    trip.driver_id = user.id
-    trip.status = "Active"
-    db.commit()
-    db.refresh(trip)
-    return trip
+    
+    print(f"✅ Found {len(requests)} requests for driver {user.email}")
+    return requests
 
 @app.get("/trips/active", response_model=schemas.TripOut)
 def get_active_trip(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):

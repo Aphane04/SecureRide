@@ -36,6 +36,9 @@ export const tripAPI = {
   getActiveTrip: () => api.get('/trips/active'),
   updateLocation: (tripId, coords) => api.patch(`/trips/${tripId}/location`, coords),
   triggerAlert: (tripId, transcript) => api.post(`/trips/${tripId}/emergency`, { transcript }),
+ getRideRequests: () => api.get('/trips/requests'),
+  acceptRide: (tripId) => api.post(`/trips/${tripId}/accept`),
+
 };
 
 export const contactAPI = {
