@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UserCheck, RefreshCw, AlertCircle, CheckCircle2, ShieldCheck, Loader2 } from 'lucide-react';
 import { authAPI } from '../../utils/api';
 
 const FaceScan = () => {
@@ -9,9 +9,8 @@ const FaceScan = () => {
   const location = useLocation();
   const userId = location.state?.userId;
 
-  const [status, setStatus] = useState("Initializing system...");
-  const [instruction, setInstruction] = useState("Wait a moment...");
-  const [step, setStep] = useState(0); // 0: Init, 1: Camera Ready, 2: Detecting, 3: Success
+  const [instruction, setInstruction] = useState("Initializing SecureScan...");
+  const [step, setStep] = useState(0); 
   const [error, setError] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(0);
@@ -23,7 +22,6 @@ const FaceScan = () => {
 
   const detectionIntervalRef = useRef(null);
   const streamRef = useRef(null);
-  const positionHistoryRef = useRef([]);
 
   const cleanup = useCallback(() => {
     if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
@@ -34,9 +32,8 @@ const FaceScan = () => {
 
   const initializeCamera = useCallback(async () => {
     try {
-      setStatus("Camera Access");
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
 
       streamRef.current = stream;
@@ -45,12 +42,12 @@ const FaceScan = () => {
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play();
           setStep(2);
-          setInstruction("Position your face in the circle");
+          setInstruction("Align your face within the frame");
           startFaceDetection();
         };
       }
     } catch (err) {
-      setError('Camera access denied. Please enable permissions.');
+      setError('Biometric sensor access denied. Please enable camera permissions.');
     }
   }, []);
 
@@ -72,7 +69,7 @@ const FaceScan = () => {
         setStep(1);
         initializeCamera();
       } catch (err) {
-        setError("Failed to load AI models.");
+        setError("System integrity check failed. Models unavailable.");
       }
     };
     loadModelsAndStart();
@@ -101,10 +98,9 @@ const FaceScan = () => {
           const noseRelX = (nose[0].x - leftEye[0].x) / eyeDist;
 
           let currentPos = 'center';
-          if (noseRelX < 0.35) currentPos = 'right';
-          else if (noseRelX > 0.65) currentPos = 'left';
+          if (noseRelX < 0.38) currentPos = 'right';
+          else if (noseRelX > 0.62) currentPos = 'left';
 
-          // Track unique movements
           if (!detectionStats.center && currentPos === 'center') {
              setDetectionStats(prev => ({ ...prev, center: true }));
           } else if (detectionStats.center && !detectionStats.left && currentPos === 'left') {
@@ -113,13 +109,12 @@ const FaceScan = () => {
              setDetectionStats(prev => ({ ...prev, right: true }));
           }
 
-          // Update Instructions based on missing steps
           if (!detectionStats.center) {
-            setInstruction("Look straight at the camera");
+            setInstruction("Look directly at the sensor");
           } else if (!detectionStats.left) {
-            setInstruction("Slowly turn your head to the LEFT ←");
+            setInstruction("Slowly rotate head to the left");
           } else if (!detectionStats.right) {
-            setInstruction("Now slowly turn your head to the RIGHT →");
+            setInstruction("Slowly rotate head to the right");
           }
 
           const progress = (Object.values(detectionStats).filter(Boolean).length / 3) * 100;
@@ -130,127 +125,183 @@ const FaceScan = () => {
           }
         } else {
           setFaceDetected(false);
-          setInstruction("Face not detected. Move into the light.");
+          if (step === 2) setInstruction("Face not detected. Improve lighting.");
         }
       } catch (err) {
         console.error(err);
       }
-    }, 200);
+    }, 150);
   };
 
   const handleComplete = async () => {
     clearInterval(detectionIntervalRef.current);
     setStep(3);
-    setInstruction("Verification Successful");
+    setInstruction("Biometric identity confirmed");
     
     try {
       if (userId) await authAPI.verifyLiveness(userId);
-      // Brief pause to show the success message
-      setTimeout(() => navigate('/dashboard/passenger'), 3000);
+      // Wait to let them see the success state
+      setTimeout(() => navigate('/login'), 4000);
     } catch (err) {
-      setError("Verification failed on server.");
+      setError("Cloud verification failed.");
       setStep(2);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-white font-sans overflow-hidden">
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white font-sans selection:bg-green-500">
       
-      {/* Top Header */}
-      <div className="mb-10 text-center z-10">
-        <h2 className="text-3xl font-black tracking-tighter mb-2">Security Check</h2>
-        <div className="flex items-center justify-center gap-2 text-[#008751] font-bold text-xs uppercase tracking-[0.2em]">
-            <CheckCircle2 size={14} /> AI-Powered Liveness Detection
+      {/* Dynamic Background Glow */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px] transition-all duration-1000 ${
+            step === 3 ? 'bg-green-600/10' : faceDetected ? 'bg-green-900/5' : 'bg-blue-900/5'
+        }`} />
+      </div>
+
+      {/* Header Section */}
+      <div className="mb-12 text-center z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-4">
+            <ShieldCheck size={14} className="text-[#008751]" />
+            <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400">SecureRide Auth v2.0</span>
+        </div>
+        <h2 className="text-4xl font-black tracking-tight mb-2 bg-gradient-to-b from-white to-gray-500 bg-clip-text text-transparent">
+            Identity Verification
+        </h2>
+      </div>
+
+      {/* Modern Instruction Box */}
+      <div className="w-full max-w-md relative z-10 mb-10">
+        <div className="absolute inset-0 bg-green-500/10 blur-xl opacity-20" />
+        <div className="relative bg-[#0d0d0d] border border-white/10 rounded-2xl p-5 text-center shadow-2xl backdrop-blur-md">
+           <p className={`text-lg font-medium tracking-wide transition-all ${step === 3 ? 'text-green-400' : 'text-gray-200'}`}>
+             {instruction}
+           </p>
         </div>
       </div>
 
-      {/* Instruction Banner */}
-      <div className={`mb-8 px-8 py-4 rounded-2xl border transition-all duration-500 ${
-        step === 3 ? 'bg-green-500/20 border-green-500' : 'bg-white/5 border-white/10'
-      }`}>
-        <p className={`text-lg font-bold text-center ${step === 3 ? 'text-green-400' : 'text-white'}`}>
-          {instruction}
-        </p>
-      </div>
-
+      {/* Success/Error Alerts */}
       {error && (
-        <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-xl text-red-400 text-sm flex items-center gap-3 animate-bounce">
-          <AlertCircle size={20} /> {error}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 duration-300">
+            <div className="bg-red-500/10 border border-red-500/50 backdrop-blur-xl px-6 py-3 rounded-full flex items-center gap-3 text-red-400 font-bold text-sm">
+                <AlertCircle size={18} /> {error}
+            </div>
         </div>
       )}
 
-      {/* Main Camera Area */}
-      <div className="relative w-80 h-80 md:w-[420px] md:h-[420px]">
-        {/* Animated Scanning Ring */}
-        <div className={`absolute inset-0 rounded-full border-2 border-dashed transition-all duration-1000 ${
-          step === 3 ? 'border-green-500 border-solid scale-105' : faceDetected ? 'border-green-500/50 animate-spin-slow' : 'border-gray-800'
-        }`} />
+      {/* Camera Viewfinder */}
+      <div className="relative group">
+        {/* Viewfinder Corners */}
+        <div className="absolute -top-2 -left-2 w-10 h-10 border-t-2 border-l-2 border-white/20 rounded-tl-2xl" />
+        <div className="absolute -top-2 -right-2 w-10 h-10 border-t-2 border-r-2 border-white/20 rounded-tr-2xl" />
+        <div className="absolute -bottom-2 -left-2 w-10 h-10 border-b-2 border-l-2 border-white/20 rounded-bl-2xl" />
+        <div className="absolute -bottom-2 -right-2 w-10 h-10 border-b-2 border-r-2 border-white/20 rounded-br-2xl" />
 
-        <div className="absolute inset-4 rounded-full overflow-hidden bg-gray-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] border-4 border-[#1a1a1a]">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-full object-cover scale-x-[-1]"
-          />
-          
-          {/* Step 3 Success Screen */}
-          {step === 3 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-600/90 backdrop-blur-md transition-all animate-in fade-in duration-500">
-               <div className="bg-white rounded-full p-4 mb-4 shadow-2xl">
-                 <UserCheck size={50} className="text-green-600" />
-               </div>
-               <h3 className="text-2xl font-black text-white mb-1">VERIFIED</h3>
-               <p className="text-white/80 text-xs font-bold uppercase tracking-widest animate-pulse">
-                 Redirecting to Dashboard...
-               </p>
+        <div className="relative w-72 h-72 md:w-[450px] md:h-[450px]">
+            {/* Pulsing Scanning Ring */}
+            <div className={`absolute inset-0 rounded-full border border-white/5 transition-all duration-700 ${
+                faceDetected ? 'scale-105 border-green-500/30' : 'scale-100'
+            }`} />
+
+            <div className="absolute inset-4 rounded-full overflow-hidden bg-zinc-900 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-[6px] border-black ring-1 ring-white/10">
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover scale-x-[-1] opacity-90 group-hover:opacity-100 transition-opacity"
+                />
+                
+                {/* Visual Scanning Effect Overlay */}
+                <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-green-500/5 to-transparent h-1/2 w-full animate-scan" />
+
+                {/* Success Screen Overlay */}
+                {step === 3 && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-xl animate-in fade-in zoom-in duration-500">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-green-500 blur-2xl opacity-40 animate-pulse" />
+                            <div className="relative bg-white rounded-full p-6 mb-6">
+                                <UserCheck size={50} className="text-green-600" />
+                            </div>
+                        </div>
+                        <h3 className="text-3xl font-black text-white mb-2 tracking-tighter">SUCCESSFUL</h3>
+                        <div className="flex items-center gap-3 text-green-400/80 font-bold text-xs uppercase tracking-widest">
+                            <Loader2 size={14} className="animate-spin" />
+                            Redirecting to login...
+                        </div>
+                    </div>
+                )}
             </div>
-          )}
+
+            {/* Status Badge */}
+            {step === 2 && (
+                <div className={`absolute -bottom-4 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full border backdrop-blur-xl shadow-2xl flex items-center gap-3 transition-all ${
+                    faceDetected ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-white/5 border-white/10 text-gray-500'
+                }`}>
+                    <RefreshCw size={14} className={`${faceDetected ? 'animate-spin' : ''}`} />
+                    <span className="text-[11px] font-black uppercase tracking-[0.15em]">
+                        {faceDetected ? 'Biometric Sync' : 'Searching...'}
+                    </span>
+                </div>
+            )}
         </div>
-
-        {/* Floating Indicator */}
-        {step === 2 && (
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-[#121212] border border-gray-800 px-6 py-2 rounded-full flex items-center gap-3 shadow-2xl">
-                <RefreshCw size={14} className={`${faceDetected ? 'animate-spin text-green-500' : 'text-gray-600'}`} />
-                <span className="text-[10px] font-black uppercase tracking-widest">
-                    {faceDetected ? 'Face Synced' : 'Searching...'}
-                </span>
-            </div>
-        )}
       </div>
 
-      {/* Task Checklist */}
-      <div className="mt-16 w-full max-w-sm">
-        <div className="grid grid-cols-3 gap-4">
+      {/* Progress Cards */}
+      <div className="mt-16 w-full max-w-xl z-10">
+        <div className="grid grid-cols-3 gap-6 mb-10">
             {[
-                { label: 'Straight', key: 'center' },
-                { label: 'Turn Left', key: 'left' },
-                { label: 'Turn Right', key: 'right' }
+                { label: 'Neutral', key: 'center' },
+                { label: 'Left Bias', key: 'left' },
+                { label: 'Right Bias', key: 'right' }
             ].map((task) => (
-                <div key={task.key} className={`flex flex-col items-center p-3 rounded-2xl border transition-all ${
-                    detectionStats[task.key] ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-white/5 border-white/5 text-gray-600'
+                <div key={task.key} className={`relative group flex flex-col items-center p-5 rounded-3xl border transition-all duration-500 ${
+                    detectionStats[task.key] 
+                    ? 'bg-green-500/5 border-green-500/50 text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.1)]' 
+                    : 'bg-white/5 border-white/5 text-gray-600'
                 }`}>
-                    <CheckCircle2 size={20} className="mb-2" />
-                    <span className="text-[9px] font-black uppercase tracking-tighter">{task.label}</span>
+                    {detectionStats[task.key] && (
+                        <div className="absolute top-2 right-2 text-green-500">
+                            <CheckCircle2 size={16} />
+                        </div>
+                    )}
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${detectionStats[task.key] ? 'text-green-400' : 'text-gray-500'}`}>
+                        {task.label}
+                    </span>
                 </div>
             ))}
         </div>
 
-        {/* Progress Bar */}
-        <div className="mt-8">
-            <div className="flex justify-between items-end mb-2">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Completion</span>
-                <span className="text-xl font-black text-white">{Math.round(verificationProgress)}%</span>
+        {/* Premium Progress Bar */}
+        <div className="relative group">
+            <div className="flex justify-between items-center mb-3">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Verification Status</span>
+                <span className="text-2xl font-black text-white tabular-nums">{Math.round(verificationProgress)}%</span>
             </div>
-            <div className="h-2 w-full bg-gray-900 rounded-full border border-white/5 overflow-hidden">
+            <div className="h-3 w-full bg-white/5 rounded-full p-1 border border-white/10 overflow-hidden">
                 <div 
-                    className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-700 shadow-[0_0_15px_rgba(34,197,94,0.4)]"
-                    style={{ width: `${verificationProgress}%` }}
+                    className="h-full bg-gradient-to-r from-green-700 via-emerald-400 to-green-500 rounded-full transition-all duration-1000 ease-out"
+                    style={{ 
+                        width: `${verificationProgress}%`,
+                        boxShadow: '0 0 20px rgba(16, 185, 129, 0.5)'
+                    }}
                 />
             </div>
         </div>
       </div>
+
+      {/* CSS For Scanning Animation */}
+      <style>{`
+        @keyframes scan {
+          0% { transform: translateY(-100%); }
+          100% { transform: translateY(200%); }
+        }
+        .animate-scan {
+          animation: scan 3s linear infinite;
+        }
+        .animate-spin-slow {
+          animation: spin 8s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };
