@@ -1,16 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, Marker } from '@react-google-maps/api';
+// Changed Marker to MarkerF for better React 18 support
+import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, MarkerF } from '@react-google-maps/api';
 import { useAiMonitor } from '../../utils/aiMonitor';
 import { Shield, MapPin, Navigation, Search } from 'lucide-react';
 import { tripAPI } from '../../utils/api';
 
+// FIX 1: Move libraries OUTSIDE the component to stop the infinite loop error
+const libraries = ['places'];
 const center = { lat: -26.2041, lng: 28.0473 };
 
 const parseDistanceKm = (text) => {
   if (!text) return 0;
   const [valueStr, unit] = text.split(' ');
   const value = parseFloat(valueStr.replace(',', '.'));
-  if (unit.toLowerCase().startsWith('m')) return value / 1000;
+  if (unit && unit.toLowerCase().startsWith('m')) return value / 1000;
   return value;
 };
 
@@ -25,9 +28,10 @@ const parseDurationMinutes = (text) => {
 };
 
 const PassengerRide = () => {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries: ['places'],
+  const { isLoaded, loadError } = useJsApiLoader({
+    // FIX 2: HARDCODE YOUR KEY HERE (Use the same one that worked in the other file)
+    googleMapsApiKey: "AIzaSyA83A7s1BCXBGOXnNAR362CkdeLPKYkGDQ",
+    libraries: libraries,
   });
 
   const [directionsResponse, setDirectionsResponse] = useState(null);
@@ -121,7 +125,10 @@ const PassengerRide = () => {
     );
   }, [activeTripDetails, directionsResponse]);
 
-  if (!isLoaded) return null;
+  // Handle Load Errors
+  if (loadError) return <div className="bg-black h-screen text-red-500 p-10">Map Error. Check console.</div>;
+  
+  if (!isLoaded) return <div className="bg-black h-screen flex items-center justify-center text-green-500 font-bold">LOADING SECURERIDE MAPS...</div>;
 
   return (
     <div className="h-[calc(100vh-64px)] bg-[#0f0f0f] text-white">
@@ -133,7 +140,8 @@ const PassengerRide = () => {
           options={{ disableDefaultUI: true }}
         >
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
-          {!directionsResponse && <Marker position={center} />}
+          {/* FIX 3: Use MarkerF to ensure it displays correctly in React 18 */}
+          {!directionsResponse && <MarkerF position={center} />}
         </GoogleMap>
 
         <div className="absolute top-6 left-6 z-10">
@@ -159,13 +167,13 @@ const PassengerRide = () => {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="relative">
                 <MapPin className="absolute left-3 top-3.5 text-gray-600" size={16} />
-                <Autocomplete className="w-full">
+                <Autocomplete>
                   <input ref={originRef} placeholder="Pickup Location" className="w-full bg-[#121212] border-none p-3 pl-10 rounded-xl text-sm focus:ring-1 focus:ring-green-500 outline-none" />
                 </Autocomplete>
               </div>
               <div className="relative">
                 <Navigation className="absolute left-3 top-3.5 text-green-600" size={16} />
-                <Autocomplete className="w-full">
+                <Autocomplete>
                   <input ref={destinationRef} placeholder="Where to?" className="w-full bg-[#121212] border-none p-3 pl-10 rounded-xl text-sm focus:ring-1 focus:ring-green-500 outline-none" />
                 </Autocomplete>
               </div>
@@ -178,7 +186,7 @@ const PassengerRide = () => {
               <button
                 onClick={requestRide}
                 disabled={!fare}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-60 py-3 rounded-2xl font-bold"
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-60 py-3 rounded-2xl font-bold transition"
               >
                 Request Ride (Cash)
               </button>
@@ -194,7 +202,7 @@ const PassengerRide = () => {
             )}
 
             {bookingMessage && (
-              <div className="mt-3 text-xs text-green-400">{bookingMessage}</div>
+              <div className="mt-3 text-xs text-green-400 animate-pulse">{bookingMessage}</div>
             )}
           </div>
         </div>
