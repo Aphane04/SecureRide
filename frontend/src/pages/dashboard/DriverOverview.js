@@ -11,7 +11,7 @@ const center = { lat: -26.2041, lng: 28.0473 };
 const DriverOverview = () => {
   const { isLoaded, loadError } = useJsApiLoader({
     // FIX 2: HARDCODE YOUR KEY HERE (Paste your AIza... key inside the quotes)
-    googleMapsApiKey: "AIzaSyD-YOUR-ACTUAL-KEY-HERE",
+    googleMapsApiKey: "AIzaSyA83A7s1BCXBGOXnNAR362CkdeLPKYkGDQ",
     libraries: libraries,
   });
 
