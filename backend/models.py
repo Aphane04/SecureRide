@@ -8,12 +8,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False) # Passenger, Driver, Admin
+    role = Column(String(20), nullable=False)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     profile = relationship("Profile", back_populates="user", uselist=False)
-    # This links to contacts for both Drivers and Passengers
     emergency_contacts = relationship("EmergencyContact", back_populates="user")
 
 class Profile(Base):
@@ -26,7 +25,8 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column(String(255))
-    id_photo_url = Column(Text, nullable=True) # Supported for Base64
+    # CRITICAL: Use Text to support long Base64 strings
+    id_photo_url = Column(Text, nullable=True) 
     
     user = relationship("User", back_populates="profile")
 
@@ -48,14 +48,15 @@ class Vehicle(Base):
     driver_id = Column(Integer, ForeignKey("driver.user_id"))
     make_model = Column(String(100))
     plate_number = Column(String(20))
-    photo_url = Column(Text, nullable=True) # Supported for Base64
+    # CRITICAL: Use Text to support long Base64 strings
+    photo_url = Column(Text, nullable=True) 
     
     driver = relationship("Driver", back_populates="vehicles")
 
 class EmergencyContact(Base):
     __tablename__ = "emergency_contact"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id")) # FK points to main user table
+    user_id = Column(Integer, ForeignKey("user.id"))
     name = Column(String(100))
     phone = Column(String(20))
     relationship_type = Column(String(50))
@@ -72,7 +73,6 @@ class Trip(Base):
     distance_km = Column(Float, default=0.0)
     duration_minutes = Column(Float, default=0.0)
     fare = Column(Float, default=0.0)
-    payment_method = Column(String(20), default="Cash")
     status = Column(String(50), default="Searching")
     start_time = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -87,4 +87,3 @@ class Admin(Base):
     __tablename__ = "admin"
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
     admin_level = Column(String(50), default="Standard")
-    can_manage_users = Column(Boolean, default=True)

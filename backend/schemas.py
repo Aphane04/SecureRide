@@ -2,7 +2,6 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
-# --- Auth & User ---
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -44,7 +43,6 @@ class UserProfileOut(BaseModel):
     id_number: Optional[str]
     is_verified: bool
 
-# --- Vehicle ---
 class VehicleOut(BaseModel):
     id: int
     make_model: str
@@ -53,7 +51,6 @@ class VehicleOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Admin ---
 class AdminUserOut(BaseModel):
     id: int
     email: str
@@ -92,12 +89,6 @@ class AdminAlertOut(BaseModel):
     transcript: str
     detected_at: datetime
 
-# --- Emergency ---
-class EmergencyContactCreate(BaseModel):
-    name: str
-    phone: str
-    relationship_type: Optional[str] = None
-
 class EmergencyContactOut(BaseModel):
     id: int
     name: str
@@ -105,17 +96,6 @@ class EmergencyContactOut(BaseModel):
     relationship_type: Optional[str] = None
     class Config:
         from_attributes = True
-
-# --- Trips ---
-class TripEstimateRequest(BaseModel):
-    pickup_location: str
-    destination: str
-    distance_km: float
-    duration_minutes: float
-
-class TripEstimateResponse(BaseModel):
-    estimated_fare: float
-    payment_method: str
 
 class TripCreate(BaseModel):
     pickup_location: str
@@ -133,6 +113,5 @@ class TripOut(BaseModel):
     distance_km: float
     duration_minutes: float
     fare: float
-    payment_method: str
     class Config:
         from_attributes = True
