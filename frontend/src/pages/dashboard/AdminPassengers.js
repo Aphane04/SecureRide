@@ -1,179 +1,175 @@
 import React, { useEffect, useState } from 'react';
 import { adminAPI } from '../../utils/api';
-import { 
-  User, Mail, ShieldCheck, ShieldAlert, Calendar, 
-  MapPin, Phone, Fingerprint, Info, X, Eye, FileText 
-} from 'lucide-react';
+import { Search, Download, Eye, ShieldCheck, ShieldAlert, X, Phone, MapPin, User, Mail, Fingerprint } from 'lucide-react';
 
 const AdminPassengers = () => {
   const [passengers, setPassengers] = useState([]);
   const [selectedPassenger, setSelectedPassenger] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Use the full URL for your backend (e.g., http://localhost:8000)
-  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+  const [activeTab, setActiveTab] = useState('All');
 
   useEffect(() => {
-    adminAPI.passengers()
-      .then((res) => {
-        setPassengers(res.data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    adminAPI.passengers().then((res) => setPassengers(res.data));
   }, []);
 
-  const labelClass = "text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold mb-1";
-  const dataClass = "text-sm font-medium text-white";
+  const API_BASE_URL = "http://localhost:8000"; // Update to your API
 
   return (
-    <div className="min-h-screen bg-black p-4 md:p-10 text-white font-sans">
-      {/* Header */}
-      <div className="max-w-6xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_10px_#22c55e]" />
-            <span className="text-[10px] font-black tracking-[0.3em] text-gray-500 uppercase">Internal Database</span>
-          </div>
-          <h2 className="text-5xl font-black tracking-tighter">Passenger Logs</h2>
-        </div>
-        <div className="bg-[#0d0d0d] border border-white/5 px-8 py-4 rounded-[2rem] flex items-center gap-4">
-            <div className="text-right">
-                <p className="text-[10px] font-bold text-gray-600 uppercase">Total Registered</p>
-                <p className="text-2xl font-black text-green-500">{passengers.length}</p>
-            </div>
-            <User className="text-gray-700" size={32} />
-        </div>
+    <div className="animate-in fade-in duration-500">
+      {/* Title Section */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-black text-[#1a1f37]">Passenger Work Management</h2>
+        <p className="text-sm text-gray-400">Class students' biometric correction and management.</p>
       </div>
 
-      {/* Table-less Grid View */}
-      <div className="max-w-6xl mx-auto space-y-3">
-        {passengers.map((p) => (
-          <div 
-            key={p.id} 
-            className="group bg-[#080808] border border-white/5 p-5 md:p-7 rounded-[2.5rem] flex flex-col md:flex-row md:items-center justify-between transition-all hover:bg-[#0c0c0c] hover:border-white/10"
+      {/* Tabs - Exactly like the image */}
+      <div className="flex items-center gap-1 mb-6">
+        {['All', 'Verified', 'Pending', 'Flagged'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-8 py-2.5 rounded-t-2xl text-xs font-bold transition-all ${
+              activeTab === tab 
+              ? 'bg-white text-blue-600 shadow-[-5px_-5px_15px_rgba(0,0,0,0.02)]' 
+              : 'text-gray-400 hover:text-gray-600'
+            }`}
           >
-            <div className="flex items-center gap-6 mb-4 md:mb-0">
-              <div className="w-14 h-14 bg-white/5 rounded-[1.5rem] flex items-center justify-center border border-white/10 group-hover:border-green-500/50 transition-all">
-                <User size={24} className="text-gray-400 group-hover:text-green-500" />
-              </div>
-              <div>
-                <h4 className="text-lg font-black tracking-tight">{p.full_name}</h4>
-                <div className="flex items-center gap-3 text-gray-500 text-xs mt-1">
-                    <span className="flex items-center gap-1"><Mail size={12}/> {p.email}</span>
-                    <span className="text-gray-800">|</span>
-                    <span className="flex items-center gap-1 font-bold text-[10px] uppercase tracking-widest">ID: {p.id_number}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between md:justify-end gap-8 border-t border-white/5 pt-4 md:border-none md:pt-0">
-              <div className="flex flex-col items-end">
-                <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Auth Status</p>
-                {p.is_verified ? (
-                  <span className="flex items-center gap-1 text-green-500 text-[10px] font-black uppercase"><ShieldCheck size={14}/> Verified</span>
-                ) : (
-                  <span className="flex items-center gap-1 text-gray-600 text-[10px] font-black uppercase"><ShieldAlert size={14}/> Pending</span>
-                )}
-              </div>
-              
-              <button 
-                onClick={() => setSelectedPassenger(p)}
-                className="bg-white text-black hover:bg-green-500 hover:text-white px-8 py-3.5 rounded-2xl text-[10px] font-black tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
-              >
-                <Eye size={16} /> VIEW DATA
-              </button>
-            </div>
-          </div>
+            {tab} Logs
+          </button>
         ))}
       </div>
 
-      {/* DETAILED INFORMATION MODAL */}
+      {/* Filter Bar */}
+      <div className="bg-white p-6 rounded-b-3xl rounded-tr-3xl shadow-sm border border-gray-100 mb-8 flex flex-wrap items-center gap-6">
+        <div className="flex-1 min-w-[200px]">
+          <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Search Name</p>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 text-gray-300" size={16} />
+            <input type="text" placeholder="Please enter here" className="w-full bg-gray-50 border border-gray-100 rounded-xl p-2.5 pl-10 text-xs outline-none focus:border-blue-500" />
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-[200px]">
+          <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Account Type</p>
+          <select className="w-full bg-gray-50 border border-gray-100 rounded-xl p-2.5 text-xs outline-none">
+            <option>All Types</option>
+            <option>Passenger</option>
+            <option>Driver</option>
+          </select>
+        </div>
+
+        <div className="flex items-end gap-3 pt-6">
+          <button className="bg-blue-600 text-white px-8 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition">Search</button>
+          <button className="bg-blue-50 text-blue-600 px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-blue-100 transition">
+            <Download size={14} /> Export
+          </button>
+        </div>
+      </div>
+
+      {/* Table Section */}
+      <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gray-50/50 border-b border-gray-100">
+              <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Full Name</th>
+              <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Email Address</th>
+              <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Updated Time</th>
+              <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Status</th>
+              <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Operate</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {passengers.map((p) => (
+              <tr key={p.id} className="hover:bg-gray-50/50 transition">
+                <td className="p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-xs">
+                      {p.full_name.charAt(0)}
+                    </div>
+                    <span className="text-sm font-bold text-gray-700">{p.full_name}</span>
+                  </div>
+                </td>
+                <td className="p-5 text-xs text-gray-500 font-medium">{p.email}</td>
+                <td className="p-5 text-xs text-gray-400">2023.10.15 14:20</td>
+                <td className="p-5">
+                  {p.is_verified ? (
+                    <span className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-green-100 flex items-center w-fit gap-1">
+                      <ShieldCheck size={12}/> Verified
+                    </span>
+                  ) : (
+                    <span className="bg-gray-50 text-gray-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-gray-100 flex items-center w-fit gap-1">
+                      <ShieldAlert size={12}/> Pending
+                    </span>
+                  )}
+                </td>
+                <td className="p-5">
+                  <div className="flex items-center justify-center gap-2">
+                    <button onClick={() => setSelectedPassenger(p)} className="px-4 py-1.5 border border-blue-100 text-blue-600 rounded-lg text-[10px] font-bold hover:bg-blue-600 hover:text-white transition">Notice</button>
+                    <button className="px-4 py-1.5 border border-blue-100 text-blue-600 rounded-lg text-[10px] font-bold hover:bg-blue-50 transition">Verify</button>
+                    <button className="px-4 py-1.5 border border-red-100 text-red-400 rounded-lg text-[10px] font-bold hover:bg-red-50 transition">Flag</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Placeholder */}
+      <div className="mt-8 flex justify-end gap-2 px-4">
+        <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-xs text-gray-400 hover:border-blue-500 hover:text-blue-500 transition">1</button>
+        <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-xs text-gray-400">2</button>
+        <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-xs text-gray-400">3</button>
+      </div>
+
+      {/* Profile Modal (View Details) */}
       {selectedPassenger && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
-          <div className="relative bg-[#0a0a0a] border border-white/10 w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[3rem] shadow-2xl p-8 md:p-12 custom-scrollbar">
-            
-            <button 
-              onClick={() => setSelectedPassenger(null)} 
-              className="absolute top-8 right-8 text-gray-500 hover:text-white transition-all bg-white/5 p-2 rounded-full"
-            >
-              <X size={24} />
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#1a1f37]/40 backdrop-blur-sm animate-in zoom-in duration-300">
+          <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-white">
+            {/* Left Image Area */}
+            <div className="md:w-1/3 bg-gray-100 border-r border-gray-100 relative">
+              <img 
+                src={`${API_BASE_URL}${selectedPassenger.id_photo_url}`} 
+                alt="Identity" 
+                className="w-full h-full object-cover grayscale-[30%]"
+              />
+              <button onClick={() => setSelectedPassenger(null)} className="absolute top-6 left-6 bg-white/20 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/40 transition">
+                <X size={20} />
+              </button>
+            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-              
-              {/* Column 1: Verification Image */}
-              <div className="lg:col-span-4">
-                <div className="sticky top-0">
-                  <p className={labelClass}>Uploaded ID Document</p>
-                  <div className="aspect-[3/4] bg-zinc-900 rounded-[2rem] overflow-hidden border border-white/10 group relative">
-                    {selectedPassenger.id_photo_url ? (
-                      <img 
-                        src={`${API_BASE_URL}${selectedPassenger.id_photo_url}`} 
-                        alt="User ID Document" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-700 italic text-center p-6">
-                        <FileText size={48} className="mb-4 opacity-20" />
-                        <span className="text-[10px] font-bold uppercase">No document image found in database</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-6 p-5 bg-white/5 border border-white/5 rounded-2xl">
-                    <p className={labelClass}>Liveness Result</p>
-                    <p className="text-xs font-bold text-green-500 flex items-center gap-2">
-                        <ShieldCheck size={14} /> AI Verification Passed
-                    </p>
-                  </div>
-                </div>
-              </div>
+            {/* Right Details Area */}
+            <div className="md:w-2/3 p-12">
+               <div className="mb-10">
+                 <h3 className="text-3xl font-black text-[#1a1f37] tracking-tighter mb-2">{selectedPassenger.full_name}</h3>
+                 <p className="text-blue-600 font-bold text-xs uppercase tracking-widest">Passenger Registry Dossier</p>
+               </div>
 
-              {/* Column 2: Data Fields */}
-              <div className="lg:col-span-8">
-                <h3 className="text-4xl font-black tracking-tighter mb-10 text-white">Registry Details</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-12">
-                  <DetailItem icon={<User size={14}/>} label="Full Name" value={selectedPassenger.full_name} />
-                  <DetailItem icon={<Mail size={14}/>} label="Email Address" value={selectedPassenger.email} />
-                  <DetailItem icon={<Fingerprint size={14}/>} label="ID/Passport Number" value={selectedPassenger.id_number} />
-                  <DetailItem icon={<Calendar size={14}/>} label="Date of Birth" value={selectedPassenger.dob} />
-                  <DetailItem icon={<Info size={14}/>} label="Gender" value={selectedPassenger.gender} />
-                  <DetailItem icon={<Info size={14}/>} label="Ethnicity" value={selectedPassenger.ethnicity} />
-                  <DetailItem icon={<Phone size={14}/>} label="Mobile Contact" value={selectedPassenger.phone} />
-                  <DetailItem icon={<MapPin size={14}/>} label="Home Address" value={selectedPassenger.address} />
-                </div>
+               <div className="grid grid-cols-2 gap-y-8 gap-x-12">
+                  <Detail label="Full Identity" value={selectedPassenger.full_name} icon={<User size={12}/>} />
+                  <Detail label="ID/Passport" value={selectedPassenger.id_number} icon={<Fingerprint size={12}/>} />
+                  <Detail label="Contact" value={selectedPassenger.phone} icon={<Phone size={12}/>} />
+                  <Detail label="Email" value={selectedPassenger.email} icon={<Mail size={12}/>} />
+                  <Detail label="Address" value={selectedPassenger.address} icon={<MapPin size={12}/>} />
+               </div>
 
-                <div className="mt-16 pt-8 border-t border-white/5">
-                  <div className="flex items-center gap-4">
-                    <button className="bg-green-600 text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-500 transition-all">
-                        Approve User
-                    </button>
-                    <button className="border border-red-500/30 text-red-500 px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
-                        Flag Account
-                    </button>
-                  </div>
-                </div>
-              </div>
+               <div className="mt-12 pt-8 border-t border-gray-50 flex gap-4">
+                  <button className="bg-blue-600 text-white px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:shadow-xl hover:shadow-blue-200 transition">Approve User</button>
+                  <button onClick={() => setSelectedPassenger(null)} className="bg-gray-100 text-gray-500 px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition">Close</button>
+               </div>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
-      `}</style>
     </div>
   );
 };
 
-// Sub-component for clean rendering
-const DetailItem = ({ icon, label, value }) => (
+const Detail = ({ label, value, icon }) => (
   <div className="flex flex-col">
-    <span className="text-[9px] uppercase tracking-[0.25em] text-gray-600 font-bold mb-2 flex items-center gap-2">
-      <span className="text-green-500/50">{icon}</span> {label}
+    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+      {icon} {label}
     </span>
-    <span className="text-sm font-bold text-white tracking-wide">{value || "---"}</span>
+    <span className="text-sm font-bold text-[#1a1f37]">{value || '---'}</span>
   </div>
 );
 
