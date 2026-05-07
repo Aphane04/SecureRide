@@ -17,7 +17,7 @@ const Consent = () => {
     authAPI.recordConsent(userId).catch(err => console.log("Backend sync failed, but continuing..."));
     
     // GO TO FACE SCAN IMMEDIATELY
-    navigate('/verify/face-scan', { state: { userId } });
+    navigate('/verify/id_upload', { state: { userId } });
   };
 
   return (
