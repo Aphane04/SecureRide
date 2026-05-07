@@ -25,7 +25,9 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column(String(255))
+    # CRITICAL: Use Text to support long Base64 strings
     id_photo_url = Column(Text, nullable=True) 
+    
     user = relationship("User", back_populates="profile")
 
 class Passenger(Base):
@@ -46,7 +48,9 @@ class Vehicle(Base):
     driver_id = Column(Integer, ForeignKey("driver.user_id"))
     make_model = Column(String(100))
     plate_number = Column(String(20))
+    # CRITICAL: Use Text to support long Base64 strings
     photo_url = Column(Text, nullable=True) 
+    
     driver = relationship("Driver", back_populates="vehicles")
 
 class EmergencyContact(Base):
@@ -56,6 +60,7 @@ class EmergencyContact(Base):
     name = Column(String(100))
     phone = Column(String(20))
     relationship_type = Column(String(50))
+    
     user = relationship("User", back_populates="emergency_contacts")
 
 class Trip(Base):
@@ -68,7 +73,6 @@ class Trip(Base):
     distance_km = Column(Float, default=0.0)
     duration_minutes = Column(Float, default=0.0)
     fare = Column(Float, default=0.0)
-    payment_method = Column(String(20), default="Cash")
     status = Column(String(50), default="Searching")
     start_time = Column(DateTime(timezone=True), server_default=func.now())
 
