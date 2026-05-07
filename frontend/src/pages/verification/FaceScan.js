@@ -1,20 +1,19 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserCheck, RefreshCw, AlertCircle, Camera } from 'lucide-react';
+import { UserCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { authAPI } from '../../utils/api';
 
 const FaceScan = () => {
   const videoRef = useRef();
-  const canvasRef = useRef();
   const navigate = useNavigate();
   const location = useLocation();
   const userId = location.state?.userId;
 
   const [status, setStatus] = useState("Initializing system...");
+  const [instruction, setInstruction] = useState("Wait a moment...");
   const [step, setStep] = useState(0); // 0: Init, 1: Camera Ready, 2: Detecting, 3: Success
   const [error, setError] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
-  const [headPosition, setHeadPosition] = useState("none");
   const [verificationProgress, setVerificationProgress] = useState(0);
   const [detectionStats, setDetectionStats] = useState({
     center: false,
@@ -26,9 +25,6 @@ const FaceScan = () => {
   const streamRef = useRef(null);
   const positionHistoryRef = useRef([]);
 
-  const steps = ["Models", "Camera", "Scanning", "Done"];
-
-  // Clean up function to stop camera and intervals
   const cleanup = useCallback(() => {
     if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
     if (streamRef.current) {
@@ -38,50 +34,36 @@ const FaceScan = () => {
 
   const initializeCamera = useCallback(async () => {
     try {
-      setStatus("Requesting camera access...");
+      setStatus("Camera Access");
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        },
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       });
 
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Important: Wait for video to actually start playing
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play();
           setStep(2);
-          setStatus("Position your face in the circle");
+          setInstruction("Position your face in the circle");
           startFaceDetection();
         };
       }
     } catch (err) {
-      console.error('Camera access error:', err);
-      setError('Camera access denied. Please allow camera permissions and refresh.');
+      setError('Camera access denied. Please enable permissions.');
     }
   }, []);
 
   useEffect(() => {
     const loadModelsAndStart = async () => {
       try {
-        // 1. Wait for window.faceapi to be available (max 10 seconds)
         let checks = 0;
         while (!window.faceapi && checks < 50) {
           await new Promise(r => setTimeout(r, 200));
           checks++;
         }
+        if (!window.faceapi) throw new Error("Library failed to load.");
 
-        if (!window.faceapi) {
-          throw new Error("Facial recognition library failed to load from CDN.");
-        }
-
-        setStatus("Loading AI models...");
-        
-        // 2. Load models from /public/models
-        // Note: Ensure filenames in /public/models match exactly what face-api expects
         await Promise.all([
           window.faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
           window.faceapi.nets.faceLandmark68Net.loadFromUri('/models')
@@ -90,11 +72,9 @@ const FaceScan = () => {
         setStep(1);
         initializeCamera();
       } catch (err) {
-        console.error('Initialization error:', err);
-        setError(err.message || "Failed to load models.");
+        setError("Failed to load AI models.");
       }
     };
-
     loadModelsAndStart();
     return () => cleanup();
   }, [initializeCamera, cleanup]);
@@ -104,7 +84,7 @@ const FaceScan = () => {
 
     detectionIntervalRef.current = setInterval(async () => {
       try {
-        if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
+        if (!videoRef.current || videoRef.current.paused) return;
 
         const detection = await window.faceapi
           .detectSingleFace(videoRef.current, new window.faceapi.TinyFaceDetectorOptions())
@@ -117,37 +97,43 @@ const FaceScan = () => {
           const leftEye = landmarks.getLeftEye();
           const rightEye = landmarks.getRightEye();
 
-          // Calculate movement
           const eyeDist = rightEye[0].x - leftEye[0].x;
           const noseRelX = (nose[0].x - leftEye[0].x) / eyeDist;
 
           let currentPos = 'center';
-          if (noseRelX < 0.3) currentPos = 'right';
-          else if (noseRelX > 0.7) currentPos = 'left';
+          if (noseRelX < 0.35) currentPos = 'right';
+          else if (noseRelX > 0.65) currentPos = 'left';
 
-          setHeadPosition(currentPos);
-          
-          // Logic for tracking progress
-          positionHistoryRef.current.push(currentPos);
-          
-          const hasLeft = positionHistoryRef.current.includes('left');
-          const hasRight = positionHistoryRef.current.includes('right');
-          const hasCenter = positionHistoryRef.current.includes('center');
+          // Track unique movements
+          if (!detectionStats.center && currentPos === 'center') {
+             setDetectionStats(prev => ({ ...prev, center: true }));
+          } else if (detectionStats.center && !detectionStats.left && currentPos === 'left') {
+             setDetectionStats(prev => ({ ...prev, left: true }));
+          } else if (detectionStats.left && !detectionStats.right && currentPos === 'right') {
+             setDetectionStats(prev => ({ ...prev, right: true }));
+          }
 
-          setDetectionStats({ center: hasCenter, left: hasLeft, right: hasRight });
+          // Update Instructions based on missing steps
+          if (!detectionStats.center) {
+            setInstruction("Look straight at the camera");
+          } else if (!detectionStats.left) {
+            setInstruction("Slowly turn your head to the LEFT ←");
+          } else if (!detectionStats.right) {
+            setInstruction("Now slowly turn your head to the RIGHT →");
+          }
 
-          const progress = [hasLeft, hasRight, hasCenter].filter(Boolean).length * 33.3;
+          const progress = (Object.values(detectionStats).filter(Boolean).length / 3) * 100;
           setVerificationProgress(progress);
 
-          if (hasLeft && hasRight && hasCenter) {
+          if (detectionStats.center && detectionStats.left && detectionStats.right) {
             handleComplete();
           }
         } else {
           setFaceDetected(false);
-          setHeadPosition('none');
+          setInstruction("Face not detected. Move into the light.");
         }
       } catch (err) {
-        console.error("Detection loop error:", err);
+        console.error(err);
       }
     }, 200);
   };
@@ -155,41 +141,52 @@ const FaceScan = () => {
   const handleComplete = async () => {
     clearInterval(detectionIntervalRef.current);
     setStep(3);
-    setStatus("Identity Verified!");
+    setInstruction("Verification Successful");
     
     try {
-      if (userId) {
-        await authAPI.verifyLiveness(userId);
-      }
-      setTimeout(() => navigate('/dashboard/passenger'), 1500);
+      if (userId) await authAPI.verifyLiveness(userId);
+      // Brief pause to show the success message
+      setTimeout(() => navigate('/dashboard/passenger'), 3000);
     } catch (err) {
-      setError("Server verification failed. Try again.");
-      setStep(2); // Reset to scanning
+      setError("Verification failed on server.");
+      setStep(2);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-white font-sans">
-      <div className="mb-8 text-center">
-        <h2 className="text-3xl font-black tracking-tight mb-2">Liveness Check</h2>
-        <p className="text-gray-500 text-xs uppercase tracking-widest">{status}</p>
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-white font-sans overflow-hidden">
+      
+      {/* Top Header */}
+      <div className="mb-10 text-center z-10">
+        <h2 className="text-3xl font-black tracking-tighter mb-2">Security Check</h2>
+        <div className="flex items-center justify-center gap-2 text-[#008751] font-bold text-xs uppercase tracking-[0.2em]">
+            <CheckCircle2 size={14} /> AI-Powered Liveness Detection
+        </div>
+      </div>
+
+      {/* Instruction Banner */}
+      <div className={`mb-8 px-8 py-4 rounded-2xl border transition-all duration-500 ${
+        step === 3 ? 'bg-green-500/20 border-green-500' : 'bg-white/5 border-white/10'
+      }`}>
+        <p className={`text-lg font-bold text-center ${step === 3 ? 'text-green-400' : 'text-white'}`}>
+          {instruction}
+        </p>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-xl text-red-400 text-sm flex items-center gap-3 max-w-md">
-          <AlertCircle size={20} />
-          {error}
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-xl text-red-400 text-sm flex items-center gap-3 animate-bounce">
+          <AlertCircle size={20} /> {error}
         </div>
       )}
 
-      <div className="relative w-72 h-72 md:w-96 md:h-96">
-        {/* Outer Ring */}
+      {/* Main Camera Area */}
+      <div className="relative w-80 h-80 md:w-[420px] md:h-[420px]">
+        {/* Animated Scanning Ring */}
         <div className={`absolute inset-0 rounded-full border-2 border-dashed transition-all duration-1000 ${
-          faceDetected ? 'border-green-500 rotate-180' : 'border-gray-800'
-        }`} style={{ transitionDuration: '10s' }} />
+          step === 3 ? 'border-green-500 border-solid scale-105' : faceDetected ? 'border-green-500/50 animate-spin-slow' : 'border-gray-800'
+        }`} />
 
-        {/* Video Container */}
-        <div className="absolute inset-3 rounded-full overflow-hidden bg-gray-900 border-4 border-[#121212]">
+        <div className="absolute inset-4 rounded-full overflow-hidden bg-gray-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] border-4 border-[#1a1a1a]">
           <video
             ref={videoRef}
             autoPlay
@@ -197,41 +194,61 @@ const FaceScan = () => {
             playsInline
             className="w-full h-full object-cover scale-x-[-1]"
           />
-          {!faceDetected && step === 2 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <p className="text-white text-sm font-bold animate-pulse">Position Face Inside</p>
+          
+          {/* Step 3 Success Screen */}
+          {step === 3 && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-600/90 backdrop-blur-md transition-all animate-in fade-in duration-500">
+               <div className="bg-white rounded-full p-4 mb-4 shadow-2xl">
+                 <UserCheck size={50} className="text-green-600" />
+               </div>
+               <h3 className="text-2xl font-black text-white mb-1">VERIFIED</h3>
+               <p className="text-white/80 text-xs font-bold uppercase tracking-widest animate-pulse">
+                 Redirecting to Dashboard...
+               </p>
             </div>
           )}
         </div>
 
-        {/* Success Overlay */}
-        {step === 3 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-green-600/20 rounded-full backdrop-blur-md">
-             <UserCheck size={80} className="text-green-500" />
-          </div>
+        {/* Floating Indicator */}
+        {step === 2 && (
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-[#121212] border border-gray-800 px-6 py-2 rounded-full flex items-center gap-3 shadow-2xl">
+                <RefreshCw size={14} className={`${faceDetected ? 'animate-spin text-green-500' : 'text-gray-600'}`} />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                    {faceDetected ? 'Face Synced' : 'Searching...'}
+                </span>
+            </div>
         )}
       </div>
 
-      {/* Progress & Controls */}
-      <div className="mt-10 w-full max-w-xs">
-        <div className="flex justify-between mb-2">
-          <span className="text-[10px] text-gray-500 font-bold uppercase">Verification Progress</span>
-          <span className="text-[10px] text-green-500 font-bold">{Math.round(verificationProgress)}%</span>
+      {/* Task Checklist */}
+      <div className="mt-16 w-full max-w-sm">
+        <div className="grid grid-cols-3 gap-4">
+            {[
+                { label: 'Straight', key: 'center' },
+                { label: 'Turn Left', key: 'left' },
+                { label: 'Turn Right', key: 'right' }
+            ].map((task) => (
+                <div key={task.key} className={`flex flex-col items-center p-3 rounded-2xl border transition-all ${
+                    detectionStats[task.key] ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-white/5 border-white/5 text-gray-600'
+                }`}>
+                    <CheckCircle2 size={20} className="mb-2" />
+                    <span className="text-[9px] font-black uppercase tracking-tighter">{task.label}</span>
+                </div>
+            ))}
         </div>
-        <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-green-500 transition-all duration-500" 
-            style={{ width: `${verificationProgress}%` }}
-          />
-        </div>
-        
-        <div className="flex justify-between mt-6">
-          {['Left', 'Center', 'Right'].map((pos) => (
-            <div key={pos} className="flex flex-col items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${detectionStats[pos.toLowerCase()] ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-gray-800'}`} />
-              <span className="text-[10px] text-gray-500 uppercase">{pos}</span>
+
+        {/* Progress Bar */}
+        <div className="mt-8">
+            <div className="flex justify-between items-end mb-2">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Completion</span>
+                <span className="text-xl font-black text-white">{Math.round(verificationProgress)}%</span>
             </div>
-          ))}
+            <div className="h-2 w-full bg-gray-900 rounded-full border border-white/5 overflow-hidden">
+                <div 
+                    className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-700 shadow-[0_0_15px_rgba(34,197,94,0.4)]"
+                    style={{ width: `${verificationProgress}%` }}
+                />
+            </div>
         </div>
       </div>
     </div>
