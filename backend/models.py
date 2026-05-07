@@ -13,6 +13,8 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     profile = relationship("Profile", back_populates="user", uselist=False)
+    # This links to contacts for both Drivers and Passengers
+    emergency_contacts = relationship("EmergencyContact", back_populates="user")
 
 class Profile(Base):
     __tablename__ = "profile"
@@ -24,7 +26,7 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column(String(255))
-    id_photo_url = Column(Text, nullable=True) # Set as Text for Base64 support
+    id_photo_url = Column(Text, nullable=True) # Supported for Base64
     
     user = relationship("User", back_populates="profile")
 
@@ -32,18 +34,12 @@ class Passenger(Base):
     __tablename__ = "passenger"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     loyalty_points = Column(Integer, default=0)
-    
-    # Emergency contacts restricted to Passenger
-    emergency_contacts = relationship("EmergencyContact", back_populates="passenger")
 
 class Driver(Base):
     __tablename__ = "driver"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     license_number = Column(String(100))
     verification_status = Column(String(50), default="Pending")
-    
-    # Emergency contacts restricted to Driver
-    emergency_contacts = relationship("EmergencyContact", back_populates="driver")
     vehicles = relationship("Vehicle", back_populates="driver")
 
 class Vehicle(Base):
@@ -52,21 +48,19 @@ class Vehicle(Base):
     driver_id = Column(Integer, ForeignKey("driver.user_id"))
     make_model = Column(String(100))
     plate_number = Column(String(20))
-    photo_url = Column(Text) # Set as Text for Base64 support
+    photo_url = Column(Text, nullable=True) # Supported for Base64
     
     driver = relationship("Driver", back_populates="vehicles")
 
 class EmergencyContact(Base):
     __tablename__ = "emergency_contact"
     id = Column(Integer, primary_key=True, index=True)
-    # Link to user_id but accessed via Passenger/Driver relationships
-    user_id = Column(Integer, ForeignKey("user.id"))
+    user_id = Column(Integer, ForeignKey("user.id")) # FK points to main user table
     name = Column(String(100))
     phone = Column(String(20))
     relationship_type = Column(String(50))
     
-    passenger = relationship("Passenger", back_populates="emergency_contacts", foreign_keys=[user_id], primaryjoin="EmergencyContact.user_id==Passenger.user_id")
-    driver = relationship("Driver", back_populates="emergency_contacts", foreign_keys=[user_id], primaryjoin="EmergencyContact.user_id==Driver.user_id")
+    user = relationship("User", back_populates="emergency_contacts")
 
 class Trip(Base):
     __tablename__ = "trip"
