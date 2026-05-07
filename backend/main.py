@@ -444,12 +444,14 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
         for trip, email in rows
     ]
 
-@app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
+@app.get("/admin/drivers")
 def admin_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
+    # Join User, Profile, and Vehicle to get the full picture
     rows = (
-        db.query(models.User, models.Profile)
+        db.query(models.User, models.Profile, models.Vehicle)
         .join(models.Profile, models.User.id == models.Profile.user_id)
+        .outerjoin(models.Vehicle, models.User.id == models.Vehicle.driver_id)
         .filter(models.User.role == "Driver")
         .all()
     )
@@ -457,11 +459,23 @@ def admin_drivers(user: models.User = Depends(get_current_user), db: Session = D
         {
             "id": u.id,
             "email": u.email,
+            "is_verified": u.is_verified,
             "full_name": p.full_name,
-            "role": u.role,
-            "is_verified": u.is_verified
+            "phone": p.phone,
+            "id_number": p.id_number,
+            "address": p.physical_address,
+            "dob": p.dob,
+            "gender": p.gender,
+            "ethnicity": p.ethnicity,
+            "id_photo_url": getattr(p, 'id_photo_url', None),
+            # Vehicle info
+            "vehicle": {
+                "make_model": v.make_model if v else "Not Registered",
+                "plate_number": v.plate_number if v else "N/A",
+                "photo_url": v.photo_url if v else None
+            } if v else None
         }
-        for u, p in rows
+        for u, p, v in rows
     ]
 
 @app.get("/admin/passengers") # Remove response_model if it restricts fields

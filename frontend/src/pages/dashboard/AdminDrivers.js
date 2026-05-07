@@ -1,38 +1,185 @@
 import React, { useEffect, useState } from 'react';
 import { adminAPI } from '../../utils/api';
+import { 
+  Search, Plus, Download, Eye, X, User, Mail, Phone, 
+  MapPin, Fingerprint, Calendar, Car, ShieldCheck, ShieldAlert 
+} from 'lucide-react';
 
 const AdminDrivers = () => {
   const [drivers, setDrivers] = useState([]);
+  const [selectedDriver, setSelectedDriver] = useState(null);
 
   useEffect(() => {
     adminAPI.drivers().then((res) => setDrivers(res.data));
   }, []);
 
+  const API_BASE_URL = "http://localhost:8000";
+
   return (
-    <div>
-      <h3 className="text-xl font-bold mb-6">Drivers Management</h3>
-      <div className="bg-[#121212] rounded-xl overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-black text-gray-400 text-sm">
-            <tr>
-              <th className="p-4">Name</th>
-              <th className="p-4">Email</th>
-              <th className="p-4">Verified</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {drivers.map((d) => (
-              <tr key={d.id}>
-                <td className="p-4">{d.full_name}</td>
-                <td className="p-4">{d.email}</td>
-                <td className="p-4">{d.is_verified ? 'Yes' : 'No'}</td>
+    <div className="min-h-screen bg-[#111111] text-white font-sans">
+      
+      {/* 1. Dark Header Section */}
+      <div className="p-8 max-w-[1600px] mx-auto">
+        <div className="flex justify-between items-center mb-10">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight mb-1 text-white">Driver Management</h2>
+            <p className="text-gray-500 text-sm font-medium">{drivers.length} Authorized fleet operators</p>
+          </div>
+          <button className="bg-[#b39ddb] hover:bg-[#9575cd] text-[#1a1a1a] px-6 py-2.5 rounded-full text-xs font-black flex items-center gap-2 transition-all">
+            <Plus size={16} /> ADD NEW DRIVER
+          </button>
+        </div>
+
+        {/* 2. White Table Container */}
+        <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Driver Identity</th>
+                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Vehicle Assigned</th>
+                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Verification</th>
+                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Contact</th>
+                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Applied</th>
+                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="text-gray-800">
+              {drivers.map((d) => (
+                <tr key={d.id} className="hover:bg-gray-50 border-b border-gray-50 transition-colors">
+                  <td className="p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center text-gray-400">
+                        {d.id_photo_url ? (
+                          <img src={`${API_BASE_URL}${d.id_photo_url}`} className="w-full h-full object-cover" />
+                        ) : <User size={20} />}
+                      </div>
+                      <span className="font-black text-sm text-[#1a1a1a]">{d.full_name}</span>
+                    </div>
+                  </td>
+                  <td className="p-5">
+                    <p className="text-xs font-bold text-gray-600">{d.vehicle?.make_model || 'None'}</p>
+                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-tighter">{d.vehicle?.plate_number || 'No Plate'}</p>
+                  </td>
+                  <td className="p-5 text-center">
+                    {d.is_verified ? (
+                      <span className="bg-green-50 text-green-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">Selected</span>
+                    ) : (
+                      <span className="bg-orange-50 text-orange-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">In Review</span>
+                    )}
+                  </td>
+                  <td className="p-5">
+                    <p className="text-xs font-medium text-gray-500">{d.email}</p>
+                    <p className="text-[10px] text-gray-400">{d.phone}</p>
+                  </td>
+                  <td className="p-5 text-xs text-gray-400 font-bold">13/01/2025</td>
+                  <td className="p-5">
+                    <div className="flex items-center justify-center gap-2">
+                      <button className="bg-[#e8f5e9] text-[#2e7d32] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#2e7d32] hover:text-white transition">NOTES</button>
+                      <button 
+                        onClick={() => setSelectedDriver(d)}
+                        className="bg-[#ede7f6] text-[#5e35b1] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#5e35b1] hover:text-white transition"
+                      >
+                        VIEW
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* DRIVER DOSSIER MODAL */}
+      {selectedDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="bg-white text-[#1a1a1a] w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[700px]">
+            {/* Left Column: Photos */}
+            <div className="md:w-1/3 bg-gray-50 p-8 border-r border-gray-100 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">License / ID Document</p>
+                <div className="aspect-[3/2] bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+                  {selectedDriver.id_photo_url ? (
+                    <img src={`${API_BASE_URL}${selectedDriver.id_photo_url}`} className="w-full h-full object-cover" />
+                  ) : <div className="w-full h-full flex items-center justify-center text-gray-300 italic text-[10px]">No Image</div>}
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Vehicle Photography</p>
+                <div className="aspect-[3/2] bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+                  {selectedDriver.vehicle?.photo_url ? (
+                    <img src={`${API_BASE_URL}${selectedDriver.vehicle.photo_url}`} className="w-full h-full object-cover" />
+                  ) : <div className="w-full h-full flex items-center justify-center text-gray-300 italic text-[10px]">Vehicle not yet registered</div>}
+                </div>
+              </div>
+
+              <div className="mt-auto pt-6 border-t border-gray-200">
+                 <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${selectedDriver.is_verified ? 'bg-green-500' : 'bg-orange-500'}`} />
+                    <span className="text-xs font-black uppercase tracking-widest">Status: {selectedDriver.is_verified ? 'Active' : 'Pending'}</span>
+                 </div>
+              </div>
+            </div>
+
+            {/* Right Column: Data */}
+            <div className="md:w-2/3 p-12 overflow-y-auto custom-scrollbar relative">
+              <button onClick={() => setSelectedDriver(null)} className="absolute top-8 right-8 text-gray-400 hover:text-black transition-colors">
+                <X size={24} />
+              </button>
+
+              <h3 className="text-3xl font-black tracking-tighter mb-1">Driver Dossier</h3>
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-10">SecureRide Fleet Management</p>
+
+              <div className="grid grid-cols-2 gap-y-10 gap-x-12">
+                <InfoBox label="Full Name" value={selectedDriver.full_name} icon={<User size={12}/>} />
+                <InfoBox label="Email Address" value={selectedDriver.email} icon={<Mail size={12}/>} />
+                <InfoBox label="ID/License Number" value={selectedDriver.id_number} icon={<Fingerprint size={12}/>} />
+                <InfoBox label="Phone Number" value={selectedDriver.phone} icon={<Phone size={12}/>} />
+                <InfoBox label="Home Address" value={selectedDriver.address} icon={<MapPin size={12}/>} />
+                <InfoBox label="Registration Date" value="13 Jan 2025" icon={<Calendar size={12}/>} />
+              </div>
+
+              <div className="mt-12 p-8 bg-gray-50 rounded-[2rem] border border-gray-100">
+                <h4 className="text-[10px] font-black text-[#5e35b1] uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                    <Car size={14}/> Vehicle Assets
+                </h4>
+                <div className="grid grid-cols-2 gap-6">
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Make & Model</p>
+                        <p className="text-sm font-black">{selectedDriver.vehicle?.make_model || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">License Plate</p>
+                        <p className="text-sm font-black">{selectedDriver.vehicle?.plate_number || 'N/A'}</p>
+                    </div>
+                </div>
+              </div>
+
+              <div className="mt-12 flex gap-4">
+                <button className="bg-[#5e35b1] text-white px-10 py-3.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-[#4527a0] transition">Authorize Driver</button>
+                <button className="border border-red-100 text-red-500 px-10 py-3.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-red-50 transition">Reject Request</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 10px; }
+      `}</style>
     </div>
   );
 };
+
+const InfoBox = ({ label, value, icon }) => (
+  <div className="flex flex-col">
+    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+      {icon} {label}
+    </span>
+    <span className="text-sm font-bold text-gray-800">{value || '---'}</span>
+  </div>
+);
 
 export default AdminDrivers;
