@@ -15,7 +15,6 @@ import {
 const AdminDash = () => {
   const navigate = useNavigate();
 
-  // Pure black and emerald green styling for the sidebar
   const navLinkClass = ({ isActive }) =>
     `flex items-center justify-between px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
       isActive 
@@ -31,17 +30,13 @@ const AdminDash = () => {
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex font-sans">
       
-      {/* SIDEBAR: Pure Black & Professional */}
+      {/* SIDEBAR: Logo Removed, labels and spacing adjusted */}
       <div className="w-72 bg-black text-white flex flex-col shadow-2xl z-20 relative">
-        <div className="p-10 flex items-center gap-3">
-          <div className="bg-green-500 p-1.5 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
-            <ShieldAlert size={20} className="text-white" />
-          </div>
-          <span className="text-xl font-black tracking-tighter uppercase">SecureRide</span>
-        </div>
+        
+        {/* We removed the <div> with the logo here */}
 
-        <nav className="flex-1 mt-4">
-          <div className="px-10 py-4 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em]">Administrative</div>
+        <nav className="flex-1 mt-12"> {/* Added more top margin for a cleaner start */}
+          <div className="px-10 py-4 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em] mb-2">Administrative</div>
           
           <NavLink to="/dashboard/admin" end className={navLinkClass}>
             <div className="flex items-center gap-4">
@@ -57,7 +52,6 @@ const AdminDash = () => {
             <ChevronRight size={12} />
           </NavLink>
 
-          {/* Corrected label from "Student Work" to "Passengers" */}
           <NavLink to="passengers" className={navLinkClass}>
             <div className="flex items-center gap-4">
                 <Users size={18}/> <span>Passengers</span>
@@ -72,7 +66,7 @@ const AdminDash = () => {
             <ChevronRight size={12} />
           </NavLink>
 
-          <div className="px-10 py-8 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em]">System</div>
+          <div className="px-10 py-8 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em] mb-2">System</div>
           
           <NavLink to="settings" className={navLinkClass}>
             <div className="flex items-center gap-4">
@@ -82,7 +76,7 @@ const AdminDash = () => {
           </NavLink>
         </nav>
 
-        {/* Logout at bottom */}
+        {/* Logout section */}
         <div className="p-10 border-t border-white/5">
           <button 
             onClick={handleLogout}
@@ -96,7 +90,7 @@ const AdminDash = () => {
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col overflow-hidden">
         
-        {/* Top Navbar: Premium White/Black Mix */}
+        {/* Top Navbar */}
         <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-12 z-10">
           <div className="flex items-center gap-4 bg-gray-50 px-5 py-2.5 rounded-2xl border border-gray-100">
             <Search size={16} className="text-gray-400" />
@@ -125,20 +119,12 @@ const AdminDash = () => {
           </div>
         </header>
 
-        {/* Page Content: Gray background for the floating white table effect */}
         <main className="flex-1 overflow-y-auto bg-[#f8f9fa] custom-scrollbar">
           <div className="p-12">
             <Outlet />
           </div>
         </main>
       </div>
-
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #008751; }
-      `}</style>
     </div>
   );
 };
