@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authAPI } from '../../utils/api';
-import { ShieldCheck, Scale, Eye, Fingerprint, Activity, ArrowRight } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 const Consent = () => {
   const navigate = useNavigate();
@@ -10,7 +10,7 @@ const Consent = () => {
   const [loading, setLoading] = useState(false);
 
   const handleConsent = async () => {
-    if (!userId) return alert("System Error: User session expired. Please restart registration.");
+    if (!userId) return alert("Session expired. Please register again.");
     setLoading(true);
     try {
       await authAPI.recordConsent(userId);
@@ -23,104 +23,110 @@ const Consent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans selection:bg-green-500 py-20 px-6">
-      <div className="max-w-4xl mx-auto">
-        
-        {/* 1. Header Section */}
-        <div className="mb-16">
-          <div className="flex items-center gap-3 text-green-500 mb-4">
-             <ShieldCheck size={24} />
-             <span className="text-[10px] font-black uppercase tracking-[0.4em]">Legal & Compliance</span>
-          </div>
-          <h1 className="text-6xl font-black tracking-tighter mb-4 italic">USER CONSENT FORM</h1>
-          <p className="text-gray-500 text-sm font-bold uppercase tracking-widest">
-            Biometric Data, AI Monitoring & Global Privacy Standards
+    <div className="min-h-screen bg-[#0a0c10] font-sans relative overflow-x-hidden">
+      
+      {/* Background Ambient Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] pointer-events-none">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[#008751] opacity-20 blur-[120px] rounded-full" />
+      </div>
+
+      {/* Header Navigation */}
+      <nav className="relative z-10 flex items-center justify-between px-10 py-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(-1)}>
+          <ChevronLeft className="text-gray-400" size={20} />
+          <span className="text-gray-400 text-sm font-medium">Back</span>
+        </div>
+        <div className="flex gap-8 text-gray-400 text-sm font-medium">
+          <span className="hover:text-white cursor-pointer transition-colors">Home</span>
+          <span className="hover:text-white cursor-pointer transition-colors">Safety</span>
+          <span className="hover:text-white cursor-pointer transition-colors">Contact</span>
+        </div>
+        <button className="bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full text-xs font-bold transition-all border border-white/10 backdrop-blur-md">
+          Help Center
+        </button>
+      </nav>
+
+      {/* Top Title Section */}
+      <div className="relative z-10 text-center pt-20 pb-24">
+        <h1 className="text-5xl font-bold text-white tracking-tight mb-4">
+          Consent Form and Policy
+        </h1>
+        <p className="text-gray-500 text-sm font-medium">
+          Last updated on May 07, 2026
+        </p>
+      </div>
+
+      {/* Main Document Body (White Content Area) */}
+      <div className="relative z-10 bg-white rounded-t-[4rem] min-h-screen shadow-[0_-20px_80px_rgba(0,0,0,0.4)]">
+        <div className="max-w-3xl mx-auto px-8 py-20 text-[#333] leading-relaxed">
+          
+          <p className="text-sm text-gray-500 mb-12">
+            SecureRide is dedicated to protecting your personal information and respecting your privacy. This Document outlines the types of biometric and trip data we collect, how we use it, and your legal rights regarding that information. By accessing or using our Services, you agree to the practices described in this Consent Form and Policy.
           </p>
-        </div>
 
-        {/* 2. Structured Content - Editorial Style */}
-        <div className="space-y-16 mb-20 border-t border-white/10 pt-16">
-          
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center gap-3 md:col-span-1">
-                <Fingerprint className="text-gray-600" size={20} />
-                <h3 className="text-xs font-black uppercase tracking-widest text-white">Biometric Data</h3>
-            </div>
-            <div className="md:col-span-2">
-                <p className="text-gray-400 text-sm leading-relaxed">
-                    You agree to provide a live facial scan for identity verification. SecureRide uses 3D mapping and liveness detection algorithms to ensure your profile matches your legal identification. This data is converted into an encrypted biometric hash and stored securely to prevent account impersonation.
-                </p>
-            </div>
-          </section>
+          <h2 className="text-3xl font-bold text-black mb-6">Information We Collect</h2>
+          <p className="text-sm text-gray-600 mb-8">We collect different types of personal and safety information depending on your role within the platform.</p>
 
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center gap-3 md:col-span-1">
-                <Activity className="text-gray-600" size={20} />
-                <h3 className="text-xs font-black uppercase tracking-widest text-white">AI Safety Monitoring</h3>
-            </div>
-            <div className="md:col-span-2">
-                <p className="text-gray-400 text-sm leading-relaxed">
-                    By proceeding, you consent to real-time AI audio analysis during active trips. Our safety model listens for high-stress keywords and danger signals to automatically trigger emergency response. No raw audio files are permanently stored unless an incident is flagged for manual review.
-                </p>
-            </div>
-          </section>
+          <div className="space-y-12">
+            {/* Section 1 */}
+            <section>
+              <h3 className="text-xl font-bold text-black mb-4">1. Personal Information You Provide to Us</h3>
+              <p className="text-sm text-gray-600 mb-4">We may collect the following types of information that you voluntarily provide:</p>
+              <ul className="list-disc pl-6 space-y-3 text-sm text-gray-600">
+                <li><strong>Account Information:</strong> When you register, we collect your full name, ID number, ethnicity, and gender to build your secure profile.</li>
+                <li><strong>Contact Information:</strong> We store your mobile number and email to facilitate ride coordination and emergency notifications.</li>
+                <li><strong>Biometric Data:</strong> During registration, a live 3D face scan is required to confirm identity and prevent account spoofing.</li>
+                <li><strong>Emergency Contacts:</strong> Drivers and Passengers provide secondary contact details for automated safety protocols.</li>
+              </ul>
+            </section>
 
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center gap-3 md:col-span-1">
-                <Scale className="text-gray-600" size={20} />
-                <h3 className="text-xs font-black uppercase tracking-widest text-white">Data Compliance</h3>
-            </div>
-            <div className="md:col-span-2">
-                <p className="text-gray-400 text-sm leading-relaxed">
-                    Our processing activities comply with the <strong>Protection of Personal Information Act (POPIA)</strong> and the <strong>General Data Protection Regulation (GDPR)</strong>. You retain the right to access, rectify, or request the erasure of your personal records at any time through our Privacy Terminal.
-                </p>
-            </div>
-          </section>
+            {/* Section 2 */}
+            <section>
+              <h3 className="text-xl font-bold text-black mb-4">2. Information Collected Automatically</h3>
+              <p className="text-sm text-gray-600 mb-4">During active trips, our AI safety infrastructure collects data automatically:</p>
+              <ul className="list-disc pl-6 space-y-3 text-sm text-gray-600">
+                <li><strong>AI Audio Monitoring:</strong> Our safety model monitors audio signals in real-time to detect keywords indicating distress, violence, or danger.</li>
+                <li><strong>GPS Location Data:</strong> Precise location tracking is active for the duration of every trip for passenger and driver security.</li>
+                <li><strong>Device Information:</strong> Details about the mobile device used to access the service to ensure session integrity.</li>
+              </ul>
+            </section>
 
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center gap-3 md:col-span-1">
-                <Eye className="text-gray-600" size={20} />
-                <h3 className="text-xs font-black uppercase tracking-widest text-white">Third Party Disclosure</h3>
-            </div>
-            <div className="md:col-span-2">
-                <p className="text-gray-400 text-sm leading-relaxed">
-                    Information including real-time GPS location and User Dossiers will only be shared with verified Law Enforcement Agencies (LEA) in the event of a critical safety alert or as required by a valid court order.
-                </p>
-            </div>
-          </section>
+            {/* Section 3 */}
+            <section>
+              <h3 className="text-xl font-bold text-black mb-4">How We Use Your Information</h3>
+              <p className="text-sm text-gray-600 mb-4">We process the collected information to enhance safety and ensure the smooth functioning of our services:</p>
+              <ul className="list-disc pl-6 space-y-3 text-sm text-gray-600">
+                <li><strong>Identity Verification:</strong> Using biometric hashes to ensure the person behind the wheel or in the car is the authorized account holder.</li>
+                <li><strong>Safety Intervention:</strong> Automatically alerting emergency services and law enforcement if the AI Monitor flags a critical safety violation.</li>
+                <li><strong>Legal Compliance:</strong> Ensuring all operations adhere to local transport regulations and data protection acts (POPIA/GDPR).</li>
+                <li><strong>Conflict Resolution:</strong> Reviewing AI transcripts and GPS logs to settle disputes or investigate reported incidents.</li>
+              </ul>
+            </section>
 
-        </div>
-
-        {/* 3. Action Area */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-10 p-12 bg-white/5 border border-white/10 rounded-[3rem] shadow-2xl">
-          <div className="max-w-md">
-            <p className="text-white text-lg font-bold mb-2">Legal Confirmation</p>
-            <p className="text-gray-500 text-xs leading-relaxed">
-                By clicking the button, you acknowledge that you have read, understood, and voluntarily agree to the terms listed above.
-            </p>
+            {/* Section 4 */}
+            <section>
+              <h3 className="text-xl font-bold text-black mb-4">Third Party Sharing</h3>
+              <p className="text-sm text-gray-600">
+                Your data is never sold to advertisers. Information is only shared with verified Law Enforcement Agencies (LEA) and your designated Emergency Contacts in the event of a high-severity safety alert.
+              </p>
+            </section>
           </div>
-          
-          <button
-            onClick={handleConsent}
-            disabled={loading}
-            className="group relative bg-white text-black hover:bg-green-600 hover:text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-4 active:scale-95 disabled:opacity-50"
-          >
-            {loading ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-                <>
-                    Confirm & Accept
-                    <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform" />
-                </>
-            )}
-          </button>
-        </div>
 
-        {/* 4. Footer Branding */}
-        <div className="mt-20 text-center opacity-20">
-            <p className="text-[10px] font-black uppercase tracking-[0.8em]">SecureRide Safety Protocol v4.0</p>
-        </div>
+          {/* Action Button Section */}
+          <div className="mt-20 pt-10 border-t border-gray-100 flex flex-col items-center">
+            <p className="text-xs text-gray-400 mb-6 text-center max-w-md">
+              By clicking "Confirm & Accept", you provide explicit consent for biometric processing and AI trip monitoring as described above.
+            </p>
+            <button 
+              onClick={handleConsent}
+              disabled={loading}
+              className="w-full max-w-sm bg-black hover:bg-[#008751] text-white py-4 rounded-xl font-bold text-sm transition-all shadow-xl active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? "PROCESSING..." : "CONFIRM & ACCEPT"}
+            </button>
+          </div>
 
+        </div>
       </div>
     </div>
   );
