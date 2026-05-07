@@ -6,17 +6,23 @@ import { ChevronLeft, ShieldCheck } from 'lucide-react';
 const Consent = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const userId = location.state?.userId;
+  const userId = location.state?.userId; // Retrieve userId from previous registration step
   const [loading, setLoading] = useState(false);
 
   const handleConsent = async () => {
     if (!userId) return alert("Session expired. Please register again.");
     setLoading(true);
     try {
+      // 1. Record the legal consent in the backend
       await authAPI.recordConsent(userId);
-      navigate('/verify/id-upload', { state: { userId } });
+      
+      // 2. REDIRECT TO FACE SCAN PAGE
+      // We pass the userId in the 'state' so the FaceScan component can access it
+      navigate('/verify/face-scan', { state: { userId } }); 
+      
     } catch (err) {
-      alert(err.response?.data?.detail || "Consent recording failed.");
+      console.error("Consent Error:", err);
+      alert(err.response?.data?.detail || "Consent recording failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -25,7 +31,7 @@ const Consent = () => {
   return (
     <div className="min-h-screen bg-white font-sans text-black selection:bg-green-100">
       
-      {/* 1. Slim Navigation Header */}
+      {/* Navigation Header */}
       <nav className="flex items-center justify-between px-8 py-4 border-b border-gray-100 max-w-5xl mx-auto">
         <div 
           className="flex items-center gap-1 cursor-pointer hover:opacity-60 transition-opacity" 
@@ -35,14 +41,14 @@ const Consent = () => {
           <span className="text-xs font-bold uppercase tracking-tighter">Back</span>
         </div>
         <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-[#008751] rounded flex items-center justify-center">
-                <ShieldCheck size={12} className="text-white" />
+            <div className="w-5 h-5 bg-[#008751] rounded flex items-center justify-center text-white">
+                <ShieldCheck size={12} />
             </div>
             <span className="font-black text-xs tracking-tighter uppercase">SecureRide Legal</span>
         </div>
       </nav>
 
-      {/* 2. Compact Title Section */}
+      {/* Compact Title Section */}
       <div className="text-center pt-8 pb-10">
         <h1 className="text-3xl md:text-4xl font-black tracking-tight text-black mb-2 uppercase">
           Consent Form and Policy
@@ -52,7 +58,7 @@ const Consent = () => {
         </p>
       </div>
 
-      {/* 3. Document Content (Optimized for standard viewports) */}
+      {/* Document Content */}
       <div className="max-w-3xl mx-auto px-6 pb-20">
         
         <div className="bg-gray-50 p-4 rounded-xl mb-10 border border-gray-100">
@@ -62,7 +68,6 @@ const Consent = () => {
         </div>
 
         <div className="space-y-8">
-          {/* Section 1 */}
           <section className="grid grid-cols-1 md:grid-cols-12 gap-4">
             <div className="md:col-span-4">
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-[#008751]">
@@ -76,7 +81,6 @@ const Consent = () => {
             </div>
           </section>
 
-          {/* Section 2 */}
           <section className="grid grid-cols-1 md:grid-cols-12 gap-4 border-t border-gray-50 pt-8">
             <div className="md:col-span-4">
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-[#008751]">
@@ -95,7 +99,6 @@ const Consent = () => {
             </div>
           </section>
 
-          {/* Section 3 */}
           <section className="grid grid-cols-1 md:grid-cols-12 gap-4 border-t border-gray-50 pt-8">
             <div className="md:col-span-4">
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-[#008751]">
@@ -110,7 +113,7 @@ const Consent = () => {
           </section>
         </div>
 
-        {/* 4. Action Section (Smaller, fits on screen) */}
+        {/* Action Section */}
         <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col items-center">
           <div className="mb-6 text-center">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Confirmation Required</p>
