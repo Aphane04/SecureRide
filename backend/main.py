@@ -306,3 +306,50 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
 def admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     return db.query(models.AiSafetyLog).all()
+
+# Add this endpoint to main.py (usually near the other /auth endpoints)
+
+@app.put("/auth/users/me", response_model=schemas.UserProfileOut)
+def update_current_user_profile(
+    data: schemas.ProfileUpdate, 
+    user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    # 1. Update Email in User table (if changed)
+    if data.email and data.email != user.email:
+        # Check if new email is already taken by someone else
+        email_check = db.query(models.User).filter(models.User.email == data.email).first()
+        if email_check:
+            raise HTTPException(status_code=400, detail="Email already in use by another account")
+        user.email = data.email
+
+    # 2. Get the associated profile
+    profile = db.query(models.Profile).filter(models.Profile.user_id == user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile record not found")
+
+    # 3. Update Profile fields
+    if data.full_name is not None: profile.full_name = data.full_name
+    if data.phone is not None: profile.phone = data.phone
+    if data.address is not None: profile.physical_address = data.address
+    if data.dob is not None: profile.dob = data.dob
+    if data.gender is not None: profile.gender = data.gender
+    if data.id_number is not None: profile.id_number = data.id_number
+
+    db.commit()
+    db.refresh(user)
+    db.refresh(profile)
+
+    # 4. Return updated data matching UserProfileOut schema
+    return {
+        "id": user.id,
+        "email": user.email,
+        "role": user.role,
+        "is_verified": user.is_verified,
+        "full_name": profile.full_name,
+        "phone": profile.phone,
+        "address": profile.physical_address,
+        "dob": profile.dob,
+        "gender": profile.gender,
+        "id_number": profile.id_number
+    }
