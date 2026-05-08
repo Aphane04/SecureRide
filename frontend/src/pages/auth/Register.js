@@ -13,14 +13,11 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // 1. Password Match Validation
     if (formData.password !== formData.confirmPassword) {
       return alert("Passwords do not match");
     }
 
     try {
-      // 2. Initial Registration (Creates user with is_verified = False)
       const response = await authAPI.register({
         email: formData.email,
         password: formData.password,
@@ -34,39 +31,55 @@ const Register = () => {
         ethnicity: formData.ethnicity
       });
 
-      console.log("Step 1 Complete: User Created", response.data);
-
-      // 3. Conditional Flow
       if (formData.accountType === "Admin") {
-        // Admins go straight to login
         alert("Admin account created successfully.");
         navigate('/login');
       } else {
-        // Passengers and Drivers enter the verification chain
-        // We pass the userId to the next page so the consent can be saved to their profile
-        navigate('/verify/consent', { 
-          state: { userId: response.data.id } 
-        });
+        navigate('/verify/consent', { state: { userId: response.data.id } });
       }
     } catch (error) {
-      console.error("Registration failed:", error);
       alert(error.response?.data?.detail || "Registration failed. Please try again.");
     }
   };
 
+  // Helper to update state and handle ID Parsing logic
   const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
+    let updatedData = { ...formData, [field]: value };
+
+    // ID Parsing Logic (South African ID Format)
+    if (field === 'idNumber' && value.length === 13) {
+      const idStr = value;
+      
+      // 1. Extract DOB
+      const yy = idStr.substring(0, 2);
+      const mm = idStr.substring(2, 4);
+      const dd = idStr.substring(4, 6);
+      
+      // Determine century (if yy > current year, assume 1900s, else 2000s)
+      const currentYearShort = new Date().getFullYear() % 100;
+      const century = parseInt(yy) <= currentYearShort ? "20" : "19";
+      const dobFormatted = `${century}${yy}-${mm}-${dd}`;
+
+      // 2. Extract Gender (Digits 7-10. < 5000 is Female, >= 5000 is Male)
+      const genderCode = parseInt(idStr.substring(6, 10));
+      const genderFormatted = genderCode < 5000 ? "Female" : "Male";
+
+      updatedData.dob = dobFormatted;
+      updatedData.gender = genderFormatted;
+    }
+
+    setFormData(updatedData);
   };
 
   // Styling Classes
   const inputContainer = "flex flex-col gap-1";
   const labelClass = "text-[9px] uppercase tracking-[0.2em] text-gray-500 font-bold ml-1";
-  const inputClass = "w-full bg-[#0d0d0d] border border-white/5 text-white p-2.5 rounded-lg focus:border-green-500 focus:bg-[#151515] outline-none transition-all text-xs placeholder:text-gray-800";
+  const inputClass = "w-full bg-[#0d0d0d] border border-white/5 text-white p-2.5 rounded-lg focus:border-green-500 focus:bg-[#151515] outline-none transition-all text-xs placeholder:text-gray-800 appearance-none";
 
   return (
     <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
       
-      {/* LEFT SIDE: Identity Panel (30% width) */}
+      {/* LEFT SIDE: Identity Panel */}
       <div className="hidden lg:flex lg:w-[30%] relative flex-col justify-between p-10 overflow-hidden border-r border-white/5">
         <img 
           src={sideImage} 
@@ -89,9 +102,8 @@ const Register = () => {
           <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Multi-Step Verification active</p>
         </div>
 
-        {/* Dynamic Progress Indicator */}
         <div className="relative z-10 flex flex-col gap-2">
-          <div className="bg-white p-4 rounded-2xl w-full text-black shadow-xl">
+          <div className="bg-white p-4 rounded-2xl w-full text-black shadow-xl border border-white">
             <span className="text-[8px] font-black mb-1 block uppercase">Step 01</span>
             <p className="text-[10px] font-bold leading-tight tracking-tight">Create your secure account</p>
           </div>
@@ -102,7 +114,7 @@ const Register = () => {
         </div>
       </div>
 
-      {/* RIGHT SIDE: Registry Form (70% width) */}
+      {/* RIGHT SIDE: Registry Form */}
       <div className="w-full lg:w-[70%] bg-black p-6 md:p-12 lg:p-16 flex flex-col items-center overflow-y-auto custom-scrollbar">
         <div className="max-w-2xl w-full">
           <div className="mb-8">
@@ -110,7 +122,7 @@ const Register = () => {
             <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Personal Data Entry Terminal</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5 text-left">
             
             <div className={inputContainer}>
               <label className={labelClass}>First Name</label>
@@ -126,7 +138,7 @@ const Register = () => {
 
             <div className={inputContainer}>
               <label className={labelClass}>ID Number</label>
-              <input type="text" placeholder="13-digit ID" required className={inputClass} 
+              <input type="text" placeholder="13-digit National ID" required maxLength={13} className={inputClass} 
                 value={formData.idNumber} onChange={e => handleChange('idNumber', e.target.value)} />
             </div>
 
@@ -148,8 +160,14 @@ const Register = () => {
 
             <div className={inputContainer}>
               <label className={labelClass}>Ethnicity</label>
-              <input type="text" placeholder="Optional" className={inputClass} 
-                value={formData.ethnicity} onChange={e => handleChange('ethnicity', e.target.value)} />
+              <select className={inputClass} value={formData.ethnicity} onChange={e => handleChange('ethnicity', e.target.value)}>
+                <option value="">Select Ethnicity</option>
+                <option value="African">African</option>
+                <option value="Indian">Indian</option>
+                <option value="White">White</option>
+                <option value="Coloured">Coloured</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             <div className={inputContainer}>
@@ -209,12 +227,12 @@ const Register = () => {
         </div>
       </div>
 
-      {/* Internal CSS for scrollbar */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+        select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1em; }
       `}</style>
     </div>
   );
