@@ -10,6 +10,7 @@ const Consent = () => {
   // Retrieve the userId passed from the Register page
   const userId = location.state?.userId; 
   const [loading, setLoading] = useState(false);
+  const [isChecked, setIsChecked] = useState(false); // State to track the checkbox
 
   const handleConsent = async () => {
     // Safety check: if userId is missing, we can't link the consent to an account
@@ -24,12 +25,11 @@ const Consent = () => {
       await authAPI.recordConsent(userId);
       
       // 2. MOVE TO THE NEXT STEP: ID Upload
-      // We carry the userId forward so the ID image can be linked to the right user
       navigate('/verify/id-upload', { state: { userId } });
 
     } catch (err) {
       console.error("Consent Sync Error:", err);
-      // For demo purposes: if backend fails but we want to continue testing the flow:
+      // For demo purposes, we still move forward even if backend sync is slow
       navigate('/verify/id-upload', { state: { userId } });
     } finally {
       setLoading(false);
@@ -46,7 +46,7 @@ const Consent = () => {
           onClick={() => navigate(-1)}
         >
           <ChevronLeft size={16} />
-          <span className="text-xs font-bold uppercase tracking-tighter">Back</span>
+          <span className="text-xs font-bold uppercase tracking-tighter text-gray-500">Back</span>
         </div>
         <div className="flex items-center gap-2 text-[#008751]">
             <ShieldCheck size={18} />
@@ -64,7 +64,7 @@ const Consent = () => {
         </p>
       </div>
 
-      {/* 3. Document Content (Optimized for standard viewports) */}
+      {/* 3. Document Content */}
       <div className="max-w-3xl mx-auto px-6 pb-20 flex-1">
         
         <div className="bg-gray-50 p-4 rounded-xl mb-10 border border-gray-100">
@@ -122,26 +122,38 @@ const Consent = () => {
           </section>
         </div>
 
-        {/* 4. Action Section (Smaller, fits on screen) */}
+        {/* 4. Action Section with Checkbox */}
         <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col items-center">
-          <div className="mb-6 text-center">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Confirmation Required</p>
-              <p className="text-[11px] text-gray-500 max-w-xs mx-auto">
-                  By clicking accept, you voluntarily agree to the SecureRide data processing terms and rules of conduct.
-              </p>
+          
+          {/* CONSENT CHECKBOX */}
+          <div className="mb-8 flex items-start gap-3 max-w-sm">
+            <input 
+                type="checkbox" 
+                id="consent"
+                className="mt-1 w-4 h-4 rounded border-gray-300 text-[#008751] focus:ring-[#008751] cursor-pointer"
+                checked={isChecked}
+                onChange={(e) => setIsChecked(e.target.checked)}
+            />
+            <label htmlFor="consent" className="text-[11px] text-gray-500 leading-snug cursor-pointer select-none">
+                I have read the Consent Form and Policy and I voluntarily agree to the SecureRide data processing terms and rules of conduct.
+            </label>
           </div>
           
           <button 
             onClick={handleConsent}
-            disabled={loading}
-            className="w-full max-w-xs bg-black hover:bg-[#008751] text-white py-3.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl"
+            disabled={loading || !isChecked} // Button is disabled if box is NOT checked
+            className={`w-full max-w-xs py-3.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
+                isChecked && !loading 
+                ? 'bg-black hover:bg-[#008751] text-white cursor-pointer' 
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+            }`}
           >
             {loading ? (
                 <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                    PROCESSING...
+                    UPLOADING...
                 </div>
-            ) : "CONFIRM & ACCEPT"}
+            ) : "CONTINUE"}
           </button>
           
           <div className="mt-6 flex items-center gap-4 opacity-30 grayscale">

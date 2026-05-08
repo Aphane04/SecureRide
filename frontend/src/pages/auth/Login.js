@@ -1,129 +1,168 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import bgImage from '../../assets/streets.png';
+import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+// Using the same branding assets
+import bgImage from '../../assets/streets.png'; 
+import { ShieldCheck, Mail, Lock, ArrowRight } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
       const response = await authAPI.login({ email, password });
       const { access_token, user } = response.data;
 
       login(user, access_token);
 
+      // Role-based redirection
       if (user.role === 'Admin') navigate('/dashboard/admin');
       else if (user.role === 'Driver') navigate('/dashboard/driver');
       else navigate('/dashboard/passenger');
     } catch (error) {
-      alert(error.response?.data?.detail || 'Login failed. Please try again.');
+      alert(error.response?.data?.detail || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Matching Register Page Styles
+  const inputContainer = "flex flex-col gap-1.5";
+  const labelClass = "text-[9px] uppercase tracking-[0.2em] text-gray-500 font-bold ml-1";
+  const inputClass = "w-full bg-[#0d0d0d] border border-white/5 text-white p-3 rounded-xl focus:border-green-500 focus:bg-[#151515] outline-none transition-all text-sm placeholder:text-gray-800";
+
   return (
-    <div className="min-h-screen bg-[#060b07] flex items-center justify-center p-4">
-      <div className="max-w-5xl w-full flex bg-black rounded-3xl overflow-hidden shadow-2xl border border-gray-900">
-        
-        {/* Left Side */}
-        <div
-          className="hidden md:flex w-1/2 p-12 flex-col justify-between relative bg-cover bg-center"
-          style={{
-            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.2)), url(${bgImage})`
-          }}
-        >
-          <div>
-            <span className="text-green-100 font-bold text-xl tracking-wider">SECURE RIDE</span>
+    <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
+      
+      {/* LEFT SIDE: Image Panel (35% width) */}
+      <div className="hidden lg:flex lg:w-[35%] relative flex-col justify-between p-12 overflow-hidden border-r border-white/5">
+        <img 
+          src={bgImage} 
+          alt="SecureRide Streets" 
+          className="absolute inset-0 w-full h-full object-cover brightness-[0.3] grayscale-[30%]" 
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-8">
+            <div className="w-6 h-6 bg-green-600 rounded flex items-center justify-center shadow-[0_0_15px_rgba(34,197,94,0.4)]">
+              <ShieldCheck size={14} className="text-white" />
+            </div>
+            <span className="font-black text-sm tracking-tighter uppercase">SecureRide</span>
+          </div>
+          
+          <h1 className="text-5xl font-black tracking-tighter leading-[0.95] mb-6">
+            Welcome <br /> <span className="text-gray-400">Back</span>
+          </h1>
+          <p className="text-gray-500 text-xs font-bold uppercase tracking-widest leading-relaxed max-w-[200px]">
+            Access your secure safety terminal
+          </p>
+        </div>
+
+        <div className="relative z-10">
+            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+                Network Status: <span className="text-green-500 animate-pulse font-black">Encrypted</span>
+            </p>
+        </div>
+      </div>
+
+      {/* RIGHT SIDE: Login Form (65% width) */}
+      <div className="w-full lg:w-[65%] bg-black p-8 md:p-16 flex flex-col items-center justify-center overflow-y-auto custom-scrollbar">
+        <div className="max-w-sm w-full">
+          
+          <div className="mb-10">
+            <h2 className="text-3xl font-black tracking-tight mb-2">Sign In Account</h2>
+            <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Identity Verification Protocol</p>
           </div>
 
-          <div className="mb-10">
-            <h1 className="text-4xl font-bold text-white mb-4">Let's Get Started</h1>
-            <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
-              Your safety is our priority. SecureRide ensures every trip is monitored and verified in real-time to keep you protected.
+          <form onSubmit={handleSubmit} className="space-y-5">
+            
+            <div className={inputContainer}>
+              <label className={labelClass}>Authorized Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3.5 text-gray-700" size={16} />
+                <input 
+                  type="email" 
+                  placeholder="name@example.com" 
+                  required 
+                  className={inputClass + " pl-10"} 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            <div className={inputContainer}>
+              <div className="flex justify-between items-center">
+                <label className={labelClass}>Access Password</label>
+                <span className="text-[9px] text-gray-600 font-bold uppercase hover:text-green-500 cursor-pointer transition-colors">Forgot?</span>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3.5 text-gray-700" size={16} />
+                <input 
+                  type="password" 
+                  placeholder="••••••••" 
+                  required 
+                  className={inputClass + " pl-10"} 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            <div className="pt-6">
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-white text-black hover:bg-green-600 hover:text-white transition-all font-black py-4 rounded-xl text-xs uppercase tracking-[0.2em] shadow-xl active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {loading ? "Verifying..." : "Enter Terminal"}
+                {!loading && <ArrowRight size={16} />}
+              </button>
+            </div>
+          </form>
+
+          {/* Social Logins - Styled more professionally */}
+          <div className="mt-12">
+            <div className="relative flex items-center justify-center mb-8">
+                <div className="absolute w-full h-px bg-white/5"></div>
+                <span className="relative bg-black px-4 text-[10px] font-black text-gray-700 uppercase tracking-widest">Secondary Access</span>
+            </div>
+
+            <div className="flex justify-center gap-4">
+               {['Google', 'Github'].map((social) => (
+                 <button key={social} className="flex-1 py-3 px-4 rounded-xl border border-white/5 bg-[#0d0d0d] hover:bg-[#151515] transition-all text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white">
+                   {social}
+                 </button>
+               ))}
+            </div>
+          </div>
+
+          <div className="mt-12 text-center">
+            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">
+              Not part of the network? {' '}
+              <Link to="/register" className="text-white font-black hover:text-green-500 underline underline-offset-8 decoration-green-500/20 transition-all ml-1">
+                Register Terminal
+              </Link>
             </p>
           </div>
 
-          <div className="text-xs text-gray-400">
-            presented by <span className="text-white font-semibold">SecureRide Tech</span>
-          </div>
-        </div>
-        
-        {/* Right Side */}
-        <div className="w-full md:w-1/2 p-12 flex">
-          <div className="flex-1 flex flex-col justify-center">
-            <h2 className="text-3xl font-bold text-white mb-8">Sign in</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="relative border-b border-gray-700 focus-within:border-green-500 transition">
-                <label className="text-xs text-gray-500 absolute -top-3.5 left-0">Your Email</label>
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="name@email.com"
-                  className="w-full bg-transparent py-3 text-white focus:outline-none placeholder-gray-700 text-sm" 
-                />
-              </div>
-
-              <div className="relative border-b border-gray-700 focus-within:border-green-500 transition">
-                <label className="text-xs text-gray-500 absolute -top-3.5 left-0">Password</label>
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  className="w-full bg-transparent py-3 text-white focus:outline-none placeholder-gray-700 text-sm" 
-                />
-              </div>
-
-              <button 
-                type="submit" 
-                className="w-full bg-[#008751] hover:bg-[#007043] text-white py-3.5 rounded-md font-semibold transition mt-8 text-sm"
-              >
-                Sign in
-              </button>
-            </form>
-
-            <div className="mt-8 flex justify-between items-center text-xs">
-              <div>
-                <span className="text-gray-500">Not a member? </span>
-                <span 
-                  onClick={() => navigate('/register')} 
-                  className="text-green-500 cursor-pointer hover:underline font-semibold"
-                >
-                  Register here
-                </span>
-              </div>
-              <span className="text-gray-600 cursor-pointer hover:text-gray-400 transition">Forgot Password?</span>
-            </div>
-          </div>
-
-          {/* Social Media Column */}
-          <div className="ml-8 hidden lg:flex flex-col items-center justify-center">
-            <div className="h-20 w-px bg-gray-800 mb-4"></div>
-            <span className="text-gray-500 text-xs mb-4">OR</span>
-            <div className="flex flex-col gap-4">
-              <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
-                <span className="text-black font-bold text-sm">f</span>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
-                <span className="text-black font-bold text-xs">𝕏</span>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
-                <span className="text-black font-bold text-sm">G</span>
-              </div>
-            </div>
-            <div className="h-20 w-px bg-gray-800 mt-4"></div>
-          </div>
         </div>
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+      `}</style>
     </div>
   );
 };

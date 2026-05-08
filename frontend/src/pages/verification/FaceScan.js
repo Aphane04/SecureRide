@@ -9,18 +9,12 @@ const FaceScan = () => {
   const location = useLocation();
   const userId = location.state?.userId;
 
-  const [instruction, setInstruction] = useState("Initializing Biometric Scanner...");
-  const [step, setStep] = useState(0); // 0: Loading, 1: Ready, 2: Scanning, 3: Success
+  const [instruction, setInstruction] = useState("Align face to start");
+  const [step, setStep] = useState(0); 
   const [error, setError] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(0);
-  
-  // Tracking which movements have been completed
-  const [detectionStats, setDetectionStats] = useState({
-    center: false,
-    left: false,
-    right: false
-  });
+  const [detectionStats, setDetectionStats] = useState({ center: false, left: false, right: false });
 
   const detectionIntervalRef = useRef(null);
   const streamRef = useRef(null);
@@ -37,45 +31,39 @@ const FaceScan = () => {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       });
-
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play();
           setStep(2);
-          setInstruction("Look straight at the camera");
           startFaceDetection();
         };
       }
     } catch (err) {
-      setError('Camera Access Denied. Please enable permissions.');
+      setError('Camera Access Denied.');
     }
   }, []);
 
   useEffect(() => {
-    const loadModelsAndStart = async () => {
+    const loadModels = async () => {
       try {
         let checks = 0;
         while (!window.faceapi && checks < 50) {
           await new Promise(r => setTimeout(r, 200));
           checks++;
         }
-        if (!window.faceapi) throw new Error("AI Library failed to load.");
-
-        const MODEL_URL = '/models';
         await Promise.all([
-          window.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          window.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+          window.faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+          window.faceapi.nets.faceLandmark68Net.loadFromUri('/models')
         ]);
-
         setStep(1);
         initializeCamera();
       } catch (err) {
-        setError("System Error: Biometric models unavailable.");
+        setError("AI Models unavailable.");
       }
     };
-    loadModelsAndStart();
+    loadModels();
     return () => cleanup();
   }, [initializeCamera, cleanup]);
 
@@ -87,10 +75,7 @@ const FaceScan = () => {
         if (!videoRef.current || videoRef.current.paused) return;
 
         const detection = await window.faceapi
-          .detectSingleFace(
-            videoRef.current, 
-            new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.4 })
-          )
+          .detectSingleFace(videoRef.current, new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.4 }))
           .withFaceLandmarks();
 
         if (detection) {
@@ -100,50 +85,36 @@ const FaceScan = () => {
           const leftEye = landmarks.getLeftEye();
           const rightEye = landmarks.getRightEye();
 
-          // Calculate horizontal orientation
           const eyeDist = rightEye[0].x - leftEye[0].x;
           const noseRelX = (nose[0].x - leftEye[0].x) / eyeDist;
 
           let currentPos = 'none';
-          
-          // Logic: Broaden thresholds to make detection easier
-          if (noseRelX < 0.45) currentPos = 'right';
-          else if (noseRelX > 0.55) currentPos = 'left';
+          // Looser thresholds for easier detection
+          if (noseRelX < 0.44) currentPos = 'right';
+          else if (noseRelX > 0.56) currentPos = 'left';
           else currentPos = 'center';
 
-          // Update stats and calculate progress
           setDetectionStats(prev => {
             const next = { ...prev };
-            // User must look center first
             if (!next.center && currentPos === 'center') next.center = true;
-            // Then turn left
             if (next.center && !next.left && currentPos === 'left') next.left = true;
-            // Then turn right
             if (next.left && !next.right && currentPos === 'right') next.right = true;
             
-            // Calculate progress based on true values
             const completedCount = Object.values(next).filter(Boolean).length;
-            setVerificationProgress((completedCount / 3) * 100);
+            const newProgress = (completedCount / 3) * 100;
+            if (newProgress !== verificationProgress) setVerificationProgress(newProgress);
             
             return next;
           });
-
         } else {
           setFaceDetected(false);
         }
-      } catch (err) {
-        console.error("AI Error:", err);
-      }
-    }, 200);
+      } catch (err) { console.error(err); }
+    }, 150);
   };
 
-  // Watch for progress completion
   useEffect(() => {
-    if (verificationProgress === 100) {
-      handleComplete();
-    }
-    
-    // Dynamic Instructions
+    if (verificationProgress === 100) handleComplete();
     if (verificationProgress === 0) setInstruction("Look straight at the camera");
     else if (verificationProgress < 66) setInstruction("Slowly turn your head LEFT ←");
     else if (verificationProgress < 100) setInstruction("Slowly turn your head RIGHT →");
@@ -152,127 +123,100 @@ const FaceScan = () => {
   const handleComplete = async () => {
     clearInterval(detectionIntervalRef.current);
     setStep(3);
-    setInstruction("Biometric Identity Confirmed");
-    
+    setInstruction("Identity Confirmed");
     try {
       if (userId) await authAPI.verifyLiveness(userId);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {
-      console.error("Finalization failed:", err);
       setTimeout(() => navigate('/login'), 3000);
     }
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-black selection:bg-green-100 flex flex-col">
+    <div className="min-h-screen bg-white font-sans text-black flex flex-col overflow-hidden">
       
-      {/* 1. Navigation Header */}
-      <nav className="flex items-center justify-between px-8 py-4 border-b border-gray-100 max-w-5xl mx-auto w-full">
-        <div className="flex items-center gap-1 cursor-pointer hover:opacity-60 transition-opacity" onClick={() => navigate(-1)}>
+      {/* 1. Header */}
+      <nav className="flex items-center justify-between px-6 py-3 border-b border-gray-100 max-w-5xl mx-auto w-full">
+        <div className="flex items-center gap-1 cursor-pointer" onClick={() => navigate(-1)}>
           <ChevronLeft size={16} />
-          <span className="text-xs font-bold uppercase tracking-tighter">Back</span>
+          <span className="text-[10px] font-bold uppercase">Back</span>
         </div>
         <div className="flex items-center gap-2 text-[#008751]">
-            <ShieldCheck size={18} />
-            <span className="font-black text-xs tracking-tighter uppercase text-black">Security Step 03 / 03</span>
+            <ShieldCheck size={16} />
+            <span className="font-black text-[10px] tracking-widest uppercase text-black">Step 03 / 03</span>
         </div>
       </nav>
 
-      {/* 2. Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full">
+      {/* 2. Compact Content Area */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="max-w-sm w-full">
           
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-black tracking-tight text-black mb-2 uppercase">
-              Face Verification
-            </h1>
-            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em]">
-              AI Liveness Detection • Secure Authentication
+          <div className="text-center mb-4">
+            <h1 className="text-2xl font-black text-black uppercase tracking-tight">Biometric Scan</h1>
+            <p className="text-gray-400 text-[9px] font-bold uppercase tracking-[0.2em]">Face Liveness Detection</p>
+          </div>
+
+          {/* 3. Instruction Banner (Outside Circle) */}
+          <div className={`mb-4 py-2 px-4 rounded-xl border text-center transition-all ${
+            faceDetected ? 'bg-[#1a1a1a] text-white border-black' : 'bg-gray-50 text-gray-400 border-gray-100'
+          }`}>
+            <p className="text-xs font-bold uppercase tracking-widest leading-none">
+              {faceDetected ? instruction : "Face not detected"}
             </p>
           </div>
 
-          {/* Camera Frame */}
-          <div className="relative mb-10 group">
-            {/* Viewfinder brackets */}
-            <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-gray-200 rounded-tl-xl" />
-            <div className="absolute -top-2 -right-2 w-8 h-8 border-t-2 border-r-2 border-gray-200 rounded-tr-xl" />
-            <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-2 border-l-2 border-gray-200 rounded-bl-xl" />
-            <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-gray-200 rounded-br-xl" />
+          {/* 4. Reduced Camera Viewfinder */}
+          <div className="relative mb-6 mx-auto w-64 h-64 md:w-72 md:h-72">
+            <div className="absolute -top-2 -left-2 w-6 h-6 border-t-2 border-l-2 border-gray-200 rounded-tl-lg" />
+            <div className="absolute -top-2 -right-2 w-6 h-6 border-t-2 border-r-2 border-gray-200 rounded-tr-lg" />
+            <div className="absolute -bottom-2 -left-2 w-6 h-6 border-b-2 border-l-2 border-gray-200 rounded-bl-lg" />
+            <div className="absolute -bottom-2 -right-2 w-6 h-6 border-b-2 border-r-2 border-gray-200 rounded-br-lg" />
 
-            <div className="relative aspect-square w-full bg-gray-50 rounded-full overflow-hidden border-8 border-white shadow-xl ring-1 ring-gray-100">
-               <video
-                 ref={videoRef}
-                 autoPlay
-                 muted
-                 playsInline
-                 className={`w-full h-full object-cover scale-x-[-1] transition-opacity duration-700 ${step === 3 ? 'opacity-20' : 'opacity-100'}`}
-               />
-
-               {/* Instruction Overlay */}
-               {step === 2 && (
-                 <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-white/80 to-transparent">
-                   <p className="text-center text-xs font-black uppercase tracking-widest text-[#008751] animate-pulse">
-                     {instruction}
-                   </p>
-                 </div>
-               )}
-
-               {/* Success State Overlay */}
+            <div className="relative w-full h-full bg-gray-50 rounded-full overflow-hidden border-4 border-white shadow-lg ring-1 ring-gray-100">
+               <video ref={videoRef} autoPlay muted playsInline className={`w-full h-full object-cover scale-x-[-1] ${step === 3 ? 'opacity-10' : 'opacity-100'}`} />
+               
                {step === 3 && (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-md animate-in fade-in zoom-in duration-500">
-                    <div className="bg-[#008751] rounded-full p-4 mb-4 shadow-xl">
-                      <UserCheck size={40} className="text-white" />
-                    </div>
-                    <h3 className="text-xl font-black text-black tracking-tight">SUCCESSFUL</h3>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">Redirecting to Login...</p>
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
+                    <div className="bg-[#008751] rounded-full p-3 mb-2 shadow-lg"><UserCheck size={30} className="text-white" /></div>
+                    <h3 className="text-sm font-black text-black uppercase">Verified</h3>
                  </div>
                )}
             </div>
 
-            {/* Sync Badge */}
-            <div className={`absolute -bottom-3 left-1/2 -translate-x-1/2 px-5 py-1.5 rounded-full border shadow-lg flex items-center gap-2 transition-all bg-white ${
+            <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full border shadow flex items-center gap-2 bg-white transition-all ${
                 faceDetected ? 'border-[#008751] text-[#008751]' : 'border-gray-100 text-gray-400'
             }`}>
-                <RefreshCw size={12} className={faceDetected ? 'animate-spin' : ''} />
-                <span className="text-[9px] font-black uppercase tracking-widest">
-                    {faceDetected ? 'Biometric Sync' : 'Align Face'}
-                </span>
+                <RefreshCw size={10} className={faceDetected ? 'animate-spin' : ''} />
+                <span className="text-[8px] font-black uppercase tracking-widest">{faceDetected ? 'Synced' : 'Aligning'}</span>
             </div>
           </div>
 
-          {/* Progress Section */}
-          <div className="bg-gray-50 border border-gray-100 rounded-[2rem] p-8">
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              {[
-                { label: 'Center', key: 'center' },
-                { label: 'Left', key: 'left' },
-                { label: 'Right', key: 'right' }
-              ].map((task) => (
-                <div key={task.key} className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${
-                    detectionStats[task.key] ? 'bg-white border-[#008751] text-[#008751] shadow-sm' : 'bg-transparent border-gray-200 text-gray-300'
+          {/* 5. Compact Progress Card */}
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {['center', 'left', 'right'].map((k) => (
+                <div key={k} className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-all ${
+                    detectionStats[k] ? 'bg-white border-[#008751] text-[#008751]' : 'bg-transparent border-gray-200 text-gray-300'
                 }`}>
-                    <CheckCircle2 size={16} />
-                    <span className="text-[9px] font-black uppercase tracking-tighter">{task.label}</span>
+                    <CheckCircle2 size={12} />
+                    <span className="text-[8px] font-black uppercase">{k}</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-between items-center mb-2 px-1">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Verification Status</span>
-                <span className="text-lg font-black text-black">{Math.round(verificationProgress)}%</span>
+            <div className="flex justify-between items-center mb-1 px-1">
+                <span className="text-[8px] font-bold text-gray-400 uppercase">Verification Progress</span>
+                <span className="text-xs font-black text-black">{Math.round(verificationProgress)}%</span>
             </div>
-            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                <div 
-                    className="h-full bg-[#008751] transition-all duration-700"
-                    style={{ width: `${verificationProgress}%` }}
-                />
+            <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-[#008751] transition-all duration-700" style={{ width: `${verificationProgress}%` }} />
             </div>
           </div>
 
           {error && (
-            <div className="mt-6 flex items-center gap-2 text-red-500 justify-center">
-              <AlertCircle size={14} />
-              <span className="text-[10px] font-bold uppercase">{error}</span>
+            <div className="mt-4 flex items-center gap-2 text-red-500 justify-center">
+              <AlertCircle size={12} />
+              <span className="text-[8px] font-black uppercase">{error}</span>
             </div>
           )}
 
