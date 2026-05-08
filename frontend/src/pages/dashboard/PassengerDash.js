@@ -18,7 +18,7 @@ const PassengerDash = () => {
     navigate('/login');
   };
 
-  // Logic: Font is black, selected state pops with a gray background and green accent
+  // Selection Logic: High-contrast black font, Selected state pops with gray background
   const navClass = ({ isActive }) =>
     `group flex items-center justify-between px-4 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 ${
       isActive 
@@ -27,10 +27,10 @@ const PassengerDash = () => {
     }`;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-white font-sans overflow-hidden">
+    <div className="flex h-[calc(100vh-64px)] bg-white font-sans overflow-hidden text-black">
       
-      {/* SIDEBAR */}
-      <aside className="w-72 bg-white border-r border-gray-100 p-8 flex flex-col justify-between z-20">
+      {/* SIDEBAR: Pure White */}
+      <aside className="w-72 bg-white border-r border-gray-200 p-8 flex flex-col justify-between z-20">
         <div>
           {/* User Branding */}
           <div className="mb-12 px-2">
@@ -46,7 +46,6 @@ const PassengerDash = () => {
           <nav className="space-y-1.5">
             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4 px-2">Navigation</p>
             
-            {/* Renamed "Overview" to "Map" */}
             <NavLink to="/dashboard/passenger" end className={navClass}>
               <div className="flex items-center gap-3">
                 <MapIcon size={18} /> <span>Map</span>
@@ -84,20 +83,21 @@ const PassengerDash = () => {
           </nav>
         </div>
 
-        {/* Logout Bottom - Styled in Deep Red */}
+        {/* Logout Bottom: Deep Red */}
         <div className="pt-6 border-t border-gray-50">
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 text-[#b91c1c] hover:text-[#991b1b] transition-all text-[11px] font-black uppercase tracking-widest hover:bg-red-50 rounded-xl w-full"
+            className="flex items-center gap-3 px-4 py-3 text-[#991b1b] hover:text-[#7f1d1d] transition-all text-[11px] font-black uppercase tracking-widest hover:bg-red-50 rounded-xl w-full"
           >
             <LogOut size={18} /> Logout System
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-auto bg-[#fcfcfc] p-6">
-        <div className="h-full w-full bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm relative">
+      {/* MAIN CONTENT AREA: Dim White (White-Greyish) */}
+      <main className="flex-1 overflow-auto bg-[#f3f4f6] p-6">
+        {/* Inner page container is pure white to make the content "pop" off the dim white background */}
+        <div className="h-full w-full bg-white rounded-[2.5rem] border border-gray-200 overflow-hidden shadow-sm relative">
             <Outlet />
         </div>
       </main>
