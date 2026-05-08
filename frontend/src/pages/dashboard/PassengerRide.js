@@ -1,11 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-// Changed Marker to MarkerF for better React 18 support
 import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, MarkerF } from '@react-google-maps/api';
 import { useAiMonitor } from '../../utils/aiMonitor';
-import { Shield, MapPin, Navigation, Search } from 'lucide-react';
+import { Shield, MapPin, Navigation, Search, Info, CreditCard, Ruler, Clock as ClockIcon } from 'lucide-react';
 import { tripAPI } from '../../utils/api';
 
-// FIX 1: Move libraries OUTSIDE the component to stop the infinite loop error
 const libraries = ['places'];
 const center = { lat: -26.2041, lng: 28.0473 };
 
@@ -29,7 +27,6 @@ const parseDurationMinutes = (text) => {
 
 const PassengerRide = () => {
   const { isLoaded, loadError } = useJsApiLoader({
-    // FIX 2: HARDCODE YOUR KEY HERE (Use the same one that worked in the other file)
     googleMapsApiKey: "AIzaSyA83A7s1BCXBGOXnNAR362CkdeLPKYkGDQ",
     libraries: libraries,
   });
@@ -51,7 +48,6 @@ const PassengerRide = () => {
 
   async function calculateRoute() {
     if (originRef.current.value === '' || destinationRef.current.value === '') return;
-
     const directionsService = new window.google.maps.DirectionsService();
     const results = await directionsService.route({
       origin: originRef.current.value,
@@ -77,7 +73,6 @@ const PassengerRide = () => {
       distance_km: km,
       duration_minutes: mins,
     });
-
     setFare(estimate.data.estimated_fare);
   }
 
@@ -91,20 +86,18 @@ const PassengerRide = () => {
       fare,
     });
     setActiveTripId(response.data.id);
-    setBookingMessage('Ride request sent. Driver is being matched.');
+    setBookingMessage('Requesting secure transport...');
   };
 
   useEffect(() => {
     if (!activeTripId) return;
-
     const poll = async () => {
       try {
         const res = await tripAPI.getActiveTrip();
         setActiveTripDetails(res.data);
-        setBookingMessage('Driver accepted. Heading to pickup.');
+        setBookingMessage('Driver Match Confirmed');
       } catch (err) {}
     };
-
     poll();
     const timer = setInterval(poll, 5000);
     return () => clearInterval(timer);
@@ -113,26 +106,27 @@ const PassengerRide = () => {
   useEffect(() => {
     if (!activeTripDetails || directionsResponse || !window.google) return;
     const service = new window.google.maps.DirectionsService();
-    service.route(
-      {
+    service.route({
         origin: activeTripDetails.pickup_location,
         destination: activeTripDetails.destination,
         travelMode: window.google.maps.TravelMode.DRIVING,
       },
-      (result, status) => {
-        if (status === 'OK') setDirectionsResponse(result);
-      }
+      (result, status) => { if (status === 'OK') setDirectionsResponse(result); }
     );
   }, [activeTripDetails, directionsResponse]);
 
-  // Handle Load Errors
-  if (loadError) return <div className="bg-black h-screen text-red-500 p-10">Map Error. Check console.</div>;
-  
-  if (!isLoaded) return <div className="bg-black h-screen flex items-center justify-center text-green-500 font-bold">LOADING SECURERIDE MAPS...</div>;
+  if (loadError) return <div className="p-10 text-red-500 font-bold">Map System Error</div>;
+  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing Secure Maps...</div>;
+
+  // Design Helpers
+  const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-3 pl-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400";
+  const labelClass = "text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1";
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-[#0f0f0f] text-white">
-      <div className="h-[55%] relative">
+    <div className="h-full bg-white flex flex-col font-sans">
+      
+      {/* 1. Map Section (Top) */}
+      <div className="h-[52%] relative border-b border-gray-100">
         <GoogleMap
           center={center}
           zoom={15}
@@ -140,75 +134,108 @@ const PassengerRide = () => {
           options={{ disableDefaultUI: true }}
         >
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
-          {/* FIX 3: Use MarkerF to ensure it displays correctly in React 18 */}
           {!directionsResponse && <MarkerF position={center} />}
         </GoogleMap>
 
+        {/* Floating Trip Status Badge */}
         <div className="absolute top-6 left-6 z-10">
           {activeTripDetails && (
-            <div className={`px-5 py-2 rounded-full flex items-center gap-3 border shadow-2xl transition-all ${dangerDetected ? 'bg-red-600 border-red-400 animate-pulse' : 'bg-green-900/40 border-green-500'}`}>
-              <div className={`w-2 h-2 rounded-full ${dangerDetected ? 'bg-white' : 'bg-green-500 animate-ping'}`} />
+            <div className={`px-5 py-2.5 rounded-full flex items-center gap-3 border shadow-2xl transition-all ${dangerDetected ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-white border-gray-100 text-black'}`}>
+              <div className={`w-2 h-2 rounded-full ${dangerDetected ? 'bg-white' : 'bg-[#008751] animate-ping'}`} />
               <span className="text-[10px] font-black uppercase tracking-widest">
-                {dangerDetected ? 'DANGER DETECTED - CONTACTING LAW' : 'Active Trip in Progress'}
+                {dangerDetected ? 'AI DANGER ALERT - CONTACTING LAW' : 'Live Trip Monitored'}
               </span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="h-[45%] p-6 border-t border-gray-900 bg-[#121212] overflow-auto">
+      {/* 2. Control Panel (Bottom) */}
+      <div className="h-[48%] p-8 bg-white overflow-y-auto custom-scrollbar">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
-            <Shield className="text-[#008751]" size={20} /> Request a Ride
-          </h2>
-
-          <div className="bg-black p-6 rounded-3xl border border-gray-800 shadow-2xl">
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4">Trip Details</p>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3.5 text-gray-600" size={16} />
-                <Autocomplete>
-                  <input ref={originRef} placeholder="Pickup Location" className="w-full bg-[#121212] border-none p-3 pl-10 rounded-xl text-sm focus:ring-1 focus:ring-green-500 outline-none" />
-                </Autocomplete>
-              </div>
-              <div className="relative">
-                <Navigation className="absolute left-3 top-3.5 text-green-600" size={16} />
-                <Autocomplete>
-                  <input ref={destinationRef} placeholder="Where to?" className="w-full bg-[#121212] border-none p-3 pl-10 rounded-xl text-sm focus:ring-1 focus:ring-green-500 outline-none" />
-                </Autocomplete>
-              </div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-black text-black tracking-tight flex items-center gap-2">
+                <Shield className="text-[#008751]" size={24} /> REQUEST RIDE
+            </h2>
+            <div className="bg-gray-100 px-4 py-1.5 rounded-full">
+                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Safety Tier: Gold</span>
             </div>
-
-            <div className="flex flex-col md:flex-row gap-4 mt-4">
-              <button onClick={calculateRoute} className="flex-1 bg-[#008751] hover:bg-green-700 py-3 rounded-2xl font-bold transition flex items-center justify-center gap-2">
-                <Search size={18}/> Calculate Fare
-              </button>
-              <button
-                onClick={requestRide}
-                disabled={!fare}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-60 py-3 rounded-2xl font-bold transition"
-              >
-                Request Ride (Cash)
-              </button>
-            </div>
-
-            {distance && (
-              <div className="mt-5 pt-4 border-t border-gray-900 grid md:grid-cols-4 gap-3 text-sm">
-                <div className="text-gray-400">Distance: <span className="text-white font-semibold">{distance}</span></div>
-                <div className="text-gray-400">Duration: <span className="text-white font-semibold">{duration}</span></div>
-                <div className="text-gray-400">Payment: <span className="text-green-500 font-semibold">Cash</span></div>
-                <div className="text-gray-400">Fare: <span className="text-green-500 font-semibold">R {fare ?? '...'}</span></div>
-              </div>
-            )}
-
-            {bookingMessage && (
-              <div className="mt-3 text-xs text-green-400 animate-pulse">{bookingMessage}</div>
-            )}
           </div>
+
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            {/* Pickup */}
+            <div className="flex flex-col">
+              <label className={labelClass}>Starting Terminal</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                <Autocomplete className="w-full">
+                  <input ref={originRef} placeholder="Enter Pickup Address" className={inputClass} />
+                </Autocomplete>
+              </div>
+            </div>
+
+            {/* Destination */}
+            <div className="flex flex-col">
+              <label className={labelClass}>Destination Point</label>
+              <div className="relative">
+                <Navigation className="absolute left-3 top-3.5 text-[#008751]" size={16} />
+                <Autocomplete className="w-full">
+                  <input ref={destinationRef} placeholder="Enter Destination Address" className={inputClass} />
+                </Autocomplete>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
+            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+              <Search size={16}/> Calculate Fare
+            </button>
+            <button
+              onClick={requestRide}
+              disabled={!fare}
+              className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
+            >
+              Request Transport (Cash)
+            </button>
+          </div>
+
+          {/* Result Analytics Section */}
+          {distance && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-2">
+              <ResultCard icon={<Ruler size={14}/>} label="Distance" value={distance} />
+              <ResultCard icon={<ClockIcon size={14}/>} label="Duration" value={duration} />
+              <ResultCard icon={<CreditCard size={14}/>} label="Payment" value="Cash" />
+              <ResultCard icon={<Info size={14}/>} label="Estimated Fare" value={`R ${fare}`} isGreen={true} />
+            </div>
+          )}
+
+          {bookingMessage && (
+            <div className="mt-8 text-center border-t border-gray-50 pt-6">
+                <p className="text-[10px] font-black text-[#008751] uppercase tracking-[0.3em] animate-pulse">
+                    {bookingMessage}
+                </p>
+            </div>
+          )}
         </div>
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+      `}</style>
     </div>
   );
 };
+
+// Sub-component for Trip Details
+const ResultCard = ({ icon, label, value, isGreen }) => (
+    <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl">
+        <div className="flex items-center gap-2 mb-1 text-gray-400">
+            {icon}
+            <span className="text-[9px] font-bold uppercase tracking-widest">{label}</span>
+        </div>
+        <p className={`text-sm font-black ${isGreen ? 'text-[#008751]' : 'text-black'}`}>{value}</p>
+    </div>
+);
 
 export default PassengerRide;
