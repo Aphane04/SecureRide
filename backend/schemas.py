@@ -134,7 +134,11 @@ class TripOut(BaseModel):
     distance_km: float
     duration_minutes: float
     fare: float
-    payment_method: str
+    # Change these to Optional to prevent crashes if they are empty in the DB
+    passenger_id: Optional[int] = None
+    driver_id: Optional[int] = None
+    payment_method: Optional[str] = "Cash"
+    
     class Config:
         from_attributes = True
 

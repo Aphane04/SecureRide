@@ -201,8 +201,21 @@ def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_
 
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def get_available_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if user.role != "Driver": raise HTTPException(status_code=403)
-    return db.query(models.Trip).filter(models.Trip.status == "Searching", models.Trip.driver_id == None).all()
+    if user.role != "Driver":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # We look for trips with status 'Searching' and no driver assigned yet
+        requests = db.query(models.Trip).filter(
+            models.Trip.status == "Searching",
+            models.Trip.driver_id == None
+        ).all()
+        
+        print(f"📡 BROADCAST: Found {len(requests)} available trips for {user.email}")
+        return requests
+    except Exception as e:
+        print(f"❌ DATABASE ERROR in requests: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch requests")
 
 @app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
 def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
