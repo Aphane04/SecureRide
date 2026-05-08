@@ -273,17 +273,61 @@ def register_vehicle(make_model: str = Form(...), plate_number: str = Form(...),
 
 # --- Admin ---
 
+# --- Update these in main.py ---
+
 @app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
 def admin_get_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
+    # Fetch all users with Passenger role
     users = db.query(models.User).filter(models.User.role == "Passenger").all()
-    return users
+    
+    result = []
+    for u in users:
+        # Safe access to profile data
+        p = u.profile
+        result.append({
+            "id": u.id,
+            "email": u.email,
+            "is_verified": u.is_verified,
+            "role": u.role,
+            "full_name": p.full_name if p else "Unknown",
+            "phone": p.phone if p else None,
+            "id_number": p.id_number if p else None,
+            "address": p.physical_address if p else None,
+            "dob": p.dob if p else None,
+            "gender": p.gender if p else None,
+            "ethnicity": p.ethnicity if p else None,
+            "id_photo_url": p.id_photo_url if p else None
+        })
+    return result
 
 @app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
 def admin_get_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     users = db.query(models.User).filter(models.User.role == "Driver").all()
-    return users
+    
+    result = []
+    for u in users:
+        p = u.profile
+        # Find the first vehicle linked to this driver
+        v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == u.id).first()
+        
+        result.append({
+            "id": u.id,
+            "email": u.email,
+            "is_verified": u.is_verified,
+            "role": u.role,
+            "full_name": p.full_name if p else "Unknown",
+            "phone": p.phone if p else None,
+            "id_number": p.id_number if p else None,
+            "address": p.physical_address if p else None,
+            "dob": p.dob if p else None,
+            "gender": p.gender if p else None,
+            "ethnicity": p.ethnicity if p else None,
+            "id_photo_url": p.id_photo_url if p else None,
+            "vehicle": v # Matches VehicleOut schema
+        })
+    return result
 
 @app.get("/admin/overview", response_model=schemas.AdminOverviewOut)
 def admin_overview(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
