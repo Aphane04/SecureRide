@@ -177,16 +177,40 @@ def estimate_trip(data: schemas.TripEstimateRequest, user: models.User = Depends
     estimated = round(base + (data.distance_km * km) + (data.duration_minutes * min), 2)
     return {"estimated_fare": estimated, "payment_method": "Cash"}
 
+# --- Replace your /trips/book endpoint with this robust version ---
+
 @app.post("/trips/book", response_model=schemas.TripOut)
 def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    trip = models.Trip(
-        passenger_id=user.id, pickup_location=data.pickup_location, destination=data.destination,
-        distance_km=data.distance_km, duration_minutes=data.duration_minutes, fare=data.fare, status="Searching"
-    )
-    db.add(trip)
-    db.commit()
-    db.refresh(trip)
-    return trip
+    print(f"📡 New Trip Request from: {user.email}")
+    
+    if user.role != "Passenger":
+        raise HTTPException(status_code=403, detail="Only passengers can request transport.")
+
+    try:
+        # We ensure the status is exactly 'Searching' (Capital S)
+        # We use the singular table model name 'Trip'
+        new_trip = models.Trip(
+            passenger_id=user.id,
+            pickup_location=data.pickup_location,
+            destination=data.destination,
+            distance_km=data.distance_km,
+            duration_minutes=data.duration_minutes,
+            fare=data.fare,
+            payment_method="Cash",
+            status="Searching"
+        )
+        
+        db.add(new_trip)
+        db.commit()
+        db.refresh(new_trip)
+        
+        print(f"✅ Trip #{new_trip.id} created and broadcasted to network.")
+        return new_trip
+
+    except Exception as e:
+        db.rollback()
+        print(f"❌ DATABASE CRASH: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database processing error. Check backend logs.")
 
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def get_available_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):

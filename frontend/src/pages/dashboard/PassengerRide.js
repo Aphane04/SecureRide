@@ -115,15 +115,19 @@ const PassengerRide = () => {
 
   const requestRide = async () => {
     if (!fare) return;
-    const response = await tripAPI.bookRide({
-      pickup_location: originRef.current.value,
-      destination: destinationRef.current.value,
-      distance_km: distanceKm,
-      duration_minutes: durationMinutes,
-      fare,
-    });
-    setActiveTripId(response.data.id);
-    setBookingMessage('Requesting secure transport...');
+    try {
+        const response = await tripAPI.bookRide({
+          pickup_location: originRef.current.value,
+          destination: destinationRef.current.value,
+          distance_km: distanceKm,
+          duration_minutes: durationMinutes,
+          fare: fare, // Ensure this matches schemas.TripCreate
+        });
+        setActiveTripId(response.data.id);
+        setBookingMessage('Request Sent. Waiting for Driver...');
+    } catch (err) {
+        console.error("Booking Error:", err.response?.data);
+    }
   };
 
   useEffect(() => {
