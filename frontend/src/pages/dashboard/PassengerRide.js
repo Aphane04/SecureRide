@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, MarkerF } from '@react-google-maps/api';
 import { useAiMonitor } from '../../utils/aiMonitor';
-import { Shield, MapPin, Navigation, Search, Info, CreditCard, Ruler, Clock as ClockIcon } from 'lucide-react';
+import { 
+  Shield, MapPin, Navigation, Search, Info, 
+  CreditCard, Ruler, Clock as ClockIcon, LocateFixed 
+} from 'lucide-react';
 import { tripAPI } from '../../utils/api';
 
 const libraries = ['places'];
@@ -40,11 +43,45 @@ const PassengerRide = () => {
   const [activeTripDetails, setActiveTripDetails] = useState(null);
   const [distanceKm, setDistanceKm] = useState(0);
   const [durationMinutes, setDurationMinutes] = useState(0);
+  const [isLocating, setIsLocating] = useState(false);
 
   const originRef = useRef();
   const destinationRef = useRef();
 
   const { dangerDetected } = useAiMonitor(activeTripId);
+
+  // NEW: Function to get current location and reverse geocode it
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      return alert("Geolocation is not supported by your browser");
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const geocoder = new window.google.maps.Geocoder();
+        
+        geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+          if (status === "OK") {
+            if (results[0]) {
+              originRef.current.value = results[0].formatted_address;
+            } else {
+              alert("No address found for this location.");
+            }
+          } else {
+            alert("Geocoder failed due to: " + status);
+          }
+          setIsLocating(false);
+        });
+      },
+      (error) => {
+        console.error(error);
+        alert("Unable to retrieve your location. Please check permissions.");
+        setIsLocating(false);
+      }
+    );
+  };
 
   async function calculateRoute() {
     if (originRef.current.value === '' || destinationRef.current.value === '') return;
@@ -118,8 +155,7 @@ const PassengerRide = () => {
   if (loadError) return <div className="p-10 text-red-500 font-bold">Map System Error</div>;
   if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing Secure Maps...</div>;
 
-  // Design Helpers
-  const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-3 pl-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400";
+  const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400";
   const labelClass = "text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1";
 
   return (
@@ -137,7 +173,6 @@ const PassengerRide = () => {
           {!directionsResponse && <MarkerF position={center} />}
         </GoogleMap>
 
-        {/* Floating Trip Status Badge */}
         <div className="absolute top-6 left-6 z-10">
           {activeTripDetails && (
             <div className={`px-5 py-2.5 rounded-full flex items-center gap-3 border shadow-2xl transition-all ${dangerDetected ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-white border-gray-100 text-black'}`}>
@@ -171,6 +206,15 @@ const PassengerRide = () => {
                 <Autocomplete className="w-full">
                   <input ref={originRef} placeholder="Enter Pickup Address" className={inputClass} />
                 </Autocomplete>
+                {/* NEW: Locate Me Button */}
+                <button 
+                  onClick={handleUseCurrentLocation}
+                  disabled={isLocating}
+                  className="absolute right-3 top-2.5 p-1 hover:bg-gray-200 rounded-md transition-colors text-[#008751]"
+                  title="Use current location"
+                >
+                  <LocateFixed size={18} className={isLocating ? 'animate-spin opacity-50' : ''} />
+                </button>
               </div>
             </div>
 
@@ -227,7 +271,6 @@ const PassengerRide = () => {
   );
 };
 
-// Sub-component for Trip Details
 const ResultCard = ({ icon, label, value, isGreen }) => (
     <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl">
         <div className="flex items-center gap-2 mb-1 text-gray-400">
