@@ -202,20 +202,23 @@ def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def get_available_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role != "Driver":
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Only drivers can access this terminal.")
+
+    # 1. Define the 'Freshness' limit (e.g., only trips from the last 10 minutes)
+    time_limit = datetime.utcnow() - timedelta(minutes=10)
 
     try:
-        # We look for trips with status 'Searching' and no driver assigned yet
+        # 2. Filter by Status, No Driver, and Time
         requests = db.query(models.Trip).filter(
             models.Trip.status == "Searching",
-            models.Trip.driver_id == None
-        ).all()
+            models.Trip.driver_id == None,
+            models.Trip.start_time >= time_limit
+        ).order_by(models.Trip.start_time.desc()).all()
         
-        print(f"📡 BROADCAST: Found {len(requests)} available trips for {user.email}")
         return requests
     except Exception as e:
-        print(f"❌ DATABASE ERROR in requests: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch requests")
+        print(f"❌ Error fetching fresh requests: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error")
 
 @app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
 def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
