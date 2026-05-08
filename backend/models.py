@@ -11,9 +11,7 @@ class User(Base):
     role = Column(String(20), nullable=False)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
     profile = relationship("Profile", back_populates="user", uselist=False)
-    emergency_contacts = relationship("EmergencyContact", back_populates="user")
 
 class Profile(Base):
     __tablename__ = "profile"
@@ -25,9 +23,7 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column(String(255))
-    # CRITICAL: Use Text to support long Base64 strings
-    id_photo_url = Column(Text, nullable=True) 
-    
+    id_photo_url = Column(Text, nullable=True) # Matches LONGTEXT
     user = relationship("User", back_populates="profile")
 
 class Passenger(Base):
@@ -40,18 +36,14 @@ class Driver(Base):
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     license_number = Column(String(100))
     verification_status = Column(String(50), default="Pending")
-    vehicles = relationship("Vehicle", back_populates="driver")
 
 class Vehicle(Base):
     __tablename__ = "vehicle"
     id = Column(Integer, primary_key=True, index=True)
-    driver_id = Column(Integer, ForeignKey("driver.user_id"))
+    driver_id = Column(Integer, ForeignKey("user.id"))
     make_model = Column(String(100))
     plate_number = Column(String(20))
-    # CRITICAL: Use Text to support long Base64 strings
-    photo_url = Column(Text, nullable=True) 
-    
-    driver = relationship("Driver", back_populates="vehicles")
+    photo_url = Column(Text, nullable=True) # Matches LONGTEXT
 
 class EmergencyContact(Base):
     __tablename__ = "emergency_contact"
@@ -60,8 +52,6 @@ class EmergencyContact(Base):
     name = Column(String(100))
     phone = Column(String(20))
     relationship_type = Column(String(50))
-    
-    user = relationship("User", back_populates="emergency_contacts")
 
 class Trip(Base):
     __tablename__ = "trip"
@@ -73,6 +63,7 @@ class Trip(Base):
     distance_km = Column(Float, default=0.0)
     duration_minutes = Column(Float, default=0.0)
     fare = Column(Float, default=0.0)
+    payment_method = Column(String(20), default="Cash")
     status = Column(String(50), default="Searching")
     start_time = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -86,4 +77,3 @@ class AiSafetyLog(Base):
 class Admin(Base):
     __tablename__ = "admin"
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
-    admin_level = Column(String(50), default="Standard")

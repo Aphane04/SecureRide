@@ -181,14 +181,7 @@ def estimate_trip(data: schemas.TripEstimateRequest, user: models.User = Depends
 
 @app.post("/trips/book", response_model=schemas.TripOut)
 def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    print(f"📡 New Trip Request from: {user.email}")
-    
-    if user.role != "Passenger":
-        raise HTTPException(status_code=403, detail="Only passengers can request transport.")
-
     try:
-        # We ensure the status is exactly 'Searching' (Capital S)
-        # We use the singular table model name 'Trip'
         new_trip = models.Trip(
             passenger_id=user.id,
             pickup_location=data.pickup_location,
@@ -196,21 +189,15 @@ def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_
             distance_km=data.distance_km,
             duration_minutes=data.duration_minutes,
             fare=data.fare,
-            payment_method="Cash",
-            status="Searching"
+            status="Searching" # Driver looks for this status
         )
-        
         db.add(new_trip)
         db.commit()
         db.refresh(new_trip)
-        
-        print(f"✅ Trip #{new_trip.id} created and broadcasted to network.")
         return new_trip
-
     except Exception as e:
         db.rollback()
-        print(f"❌ DATABASE CRASH: {str(e)}")
-        raise HTTPException(status_code=500, detail="Database processing error. Check backend logs.")
+        raise HTTPException(status_code=500, detail=f"Booking Failed: {str(e)}")
 
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def get_available_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -218,10 +205,16 @@ def get_available_requests(user: models.User = Depends(get_current_user), db: Se
     return db.query(models.Trip).filter(models.Trip.status == "Searching", models.Trip.driver_id == None).all()
 
 @app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
-def accept_ride(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 1. Find the trip
     trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if not trip or trip.driver_id: raise HTTPException(404)
-    trip.driver_id, trip.status = user.id, "Active"
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    
+    # 2. Update status and link driver
+    trip.driver_id = user.id
+    trip.status = "Active" # Passenger polls for this status
+    
     db.commit()
     db.refresh(trip)
     return trip
