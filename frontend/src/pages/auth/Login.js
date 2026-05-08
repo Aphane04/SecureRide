@@ -123,7 +123,7 @@ const Login = () => {
                 disabled={loading}
                 className="w-full bg-white text-black hover:bg-green-600 hover:text-white transition-all font-black py-4 rounded-xl text-xs uppercase tracking-[0.2em] shadow-xl active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
               >
-                {loading ? "Verifying..." : "Enter Terminal"}
+                {loading ? "Verifying..." : "Sign In"}
                 {!loading && <ArrowRight size={16} />}
               </button>
             </div>
