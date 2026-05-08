@@ -46,7 +46,7 @@ const Login = () => {
         <img 
           src={bgImage} 
           alt="SecureRide Streets" 
-          className="absolute inset-0 w-full h-full object-cover brightness-[0.3] grayscale-[30%]" 
+          className="absolute inset-0 w-full h-full object-cover brightness-[0.5] grayscale-[50%]" 
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
 
@@ -59,7 +59,7 @@ const Login = () => {
           </div>
           
           <h1 className="text-5xl font-black tracking-tighter leading-[0.95] mb-6">
-            Welcome <br /> <span className="text-gray-400">Back</span>
+            Welcome <br /> <span className="text-gray-400">USER</span>
           </h1>
           <p className="text-gray-500 text-xs font-bold uppercase tracking-widest leading-relaxed max-w-[200px]">
             Access your secure safety terminal
@@ -68,7 +68,7 @@ const Login = () => {
 
         <div className="relative z-10">
             <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-                Network Status: <span className="text-green-500 animate-pulse font-black">Encrypted</span>
+                Network Status: <span className="text-green-500 animate-pulse font-black">Encrypted, Secure</span>
             </p>
         </div>
       </div>
