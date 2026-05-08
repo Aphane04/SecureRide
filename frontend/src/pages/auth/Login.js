@@ -101,7 +101,7 @@ const Login = () => {
 
             <div className={inputContainer}>
               <div className="flex justify-between items-center">
-                <label className={labelClass}>Access Password</label>
+                <label className={labelClass}>Password</label>
                 <span className="text-[9px] text-gray-600 font-bold uppercase hover:text-green-500 cursor-pointer transition-colors">Forgot?</span>
               </div>
               <div className="relative">
@@ -136,20 +136,14 @@ const Login = () => {
                 <span className="relative bg-black px-4 text-[10px] font-black text-gray-700 uppercase tracking-widest">Secondary Access</span>
             </div>
 
-            <div className="flex justify-center gap-4">
-               {['Google', 'Github'].map((social) => (
-                 <button key={social} className="flex-1 py-3 px-4 rounded-xl border border-white/5 bg-[#0d0d0d] hover:bg-[#151515] transition-all text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white">
-                   {social}
-                 </button>
-               ))}
-            </div>
+           
           </div>
 
           <div className="mt-12 text-center">
             <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">
-              Not part of the network? {' '}
+              Do not have an account? {' '}
               <Link to="/register" className="text-white font-black hover:text-green-500 underline underline-offset-8 decoration-green-500/20 transition-all ml-1">
-                Register Terminal
+                Register Here
               </Link>
             </p>
           </div>
