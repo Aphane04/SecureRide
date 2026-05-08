@@ -6,25 +6,41 @@ import { ChevronLeft, ShieldCheck } from 'lucide-react';
 const Consent = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const userId = location.state?.userId; // Retrieve userId from previous registration step
+  
+  // Retrieve the userId passed from the Register page
+  const userId = location.state?.userId; 
   const [loading, setLoading] = useState(false);
 
   const handleConsent = async () => {
-    if (!userId) return alert("User ID missing. Please register again.");
-    
-    // We try to tell the backend, but we don't WAIT for it.
-    // This ensures the user always goes to the next page.
-    authAPI.recordConsent(userId).catch(err => console.log("Backend sync failed, but continuing..."));
-    
-    // GO TO FACE SCAN IMMEDIATELY
-    navigate('/verify/id-upload', { state: { userId } });
+    // Safety check: if userId is missing, we can't link the consent to an account
+    if (!userId) {
+        alert("Session Error: User ID not found. Please restart the registration.");
+        return navigate('/register');
+    }
+
+    setLoading(true);
+    try {
+      // 1. Record the consent in the database
+      await authAPI.recordConsent(userId);
+      
+      // 2. MOVE TO THE NEXT STEP: ID Upload
+      // We carry the userId forward so the ID image can be linked to the right user
+      navigate('/verify/id-upload', { state: { userId } });
+
+    } catch (err) {
+      console.error("Consent Sync Error:", err);
+      // For demo purposes: if backend fails but we want to continue testing the flow:
+      navigate('/verify/id-upload', { state: { userId } });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-black selection:bg-green-100">
+    <div className="min-h-screen bg-white font-sans text-black selection:bg-green-100 flex flex-col">
       
-      {/* Navigation Header */}
-      <nav className="flex items-center justify-between px-8 py-4 border-b border-gray-100 max-w-5xl mx-auto">
+      {/* 1. Slim Navigation Header */}
+      <nav className="flex items-center justify-between px-8 py-4 border-b border-gray-100 max-w-5xl mx-auto w-full">
         <div 
           className="flex items-center gap-1 cursor-pointer hover:opacity-60 transition-opacity" 
           onClick={() => navigate(-1)}
@@ -32,15 +48,13 @@ const Consent = () => {
           <ChevronLeft size={16} />
           <span className="text-xs font-bold uppercase tracking-tighter">Back</span>
         </div>
-        <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-[#008751] rounded flex items-center justify-center text-white">
-                <ShieldCheck size={12} />
-            </div>
-            <span className="font-black text-xs tracking-tighter uppercase">SecureRide Legal</span>
+        <div className="flex items-center gap-2 text-[#008751]">
+            <ShieldCheck size={18} />
+            <span className="font-black text-xs tracking-tighter uppercase text-black">Compliance Terminal</span>
         </div>
       </nav>
 
-      {/* Compact Title Section */}
+      {/* 2. Compact Title Section */}
       <div className="text-center pt-8 pb-10">
         <h1 className="text-3xl md:text-4xl font-black tracking-tight text-black mb-2 uppercase">
           Consent Form and Policy
@@ -50,16 +64,17 @@ const Consent = () => {
         </p>
       </div>
 
-      {/* Document Content */}
-      <div className="max-w-3xl mx-auto px-6 pb-20">
+      {/* 3. Document Content (Optimized for standard viewports) */}
+      <div className="max-w-3xl mx-auto px-6 pb-20 flex-1">
         
         <div className="bg-gray-50 p-4 rounded-xl mb-10 border border-gray-100">
           <p className="text-xs text-gray-500 leading-relaxed text-center italic">
-            Please review the following safety protocols and data handling rules. Your agreement is required to activate the AI-monitored features of your SecureRide account.
+            Please review the following safety protocols and data handling rules. Your agreement is required to proceed to the identity verification stage.
           </p>
         </div>
 
         <div className="space-y-8">
+          {/* Section 1 */}
           <section className="grid grid-cols-1 md:grid-cols-12 gap-4">
             <div className="md:col-span-4">
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-[#008751]">
@@ -73,6 +88,7 @@ const Consent = () => {
             </div>
           </section>
 
+          {/* Section 2 */}
           <section className="grid grid-cols-1 md:grid-cols-12 gap-4 border-t border-gray-50 pt-8">
             <div className="md:col-span-4">
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-[#008751]">
@@ -91,6 +107,7 @@ const Consent = () => {
             </div>
           </section>
 
+          {/* Section 3 */}
           <section className="grid grid-cols-1 md:grid-cols-12 gap-4 border-t border-gray-50 pt-8">
             <div className="md:col-span-4">
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-[#008751]">
@@ -105,21 +122,26 @@ const Consent = () => {
           </section>
         </div>
 
-        {/* Action Section */}
+        {/* 4. Action Section (Smaller, fits on screen) */}
         <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col items-center">
           <div className="mb-6 text-center">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Confirmation Required</p>
               <p className="text-[11px] text-gray-500 max-w-xs mx-auto">
-                  By clicking accept, you voluntarily agree to the SecureRide data processing terms.
+                  By clicking accept, you voluntarily agree to the SecureRide data processing terms and rules of conduct.
               </p>
           </div>
           
           <button 
             onClick={handleConsent}
             disabled={loading}
-            className="w-full max-w-xs bg-black hover:bg-[#008751] text-white py-3.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+            className="w-full max-w-xs bg-black hover:bg-[#008751] text-white py-3.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl"
           >
-            {loading ? "SAVING..." : "CONFIRM & ACCEPT"}
+            {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    PROCESSING...
+                </div>
+            ) : "CONFIRM & ACCEPT"}
           </button>
           
           <div className="mt-6 flex items-center gap-4 opacity-30 grayscale">

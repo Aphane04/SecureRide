@@ -13,11 +13,14 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Password Match Validation
     if (formData.password !== formData.confirmPassword) {
       return alert("Passwords do not match");
     }
 
     try {
+      // 2. Initial Registration (Creates user with is_verified = False)
       const response = await authAPI.register({
         email: formData.email,
         password: formData.password,
@@ -31,14 +34,23 @@ const Register = () => {
         ethnicity: formData.ethnicity
       });
 
+      console.log("Step 1 Complete: User Created", response.data);
+
+      // 3. Conditional Flow
       if (formData.accountType === "Admin") {
-        alert("Admin account created. Redirecting to Login.");
+        // Admins go straight to login
+        alert("Admin account created successfully.");
         navigate('/login');
       } else {
-        navigate('/verify/consent', { state: { userId: response.data.id } });
+        // Passengers and Drivers enter the verification chain
+        // We pass the userId to the next page so the consent can be saved to their profile
+        navigate('/verify/consent', { 
+          state: { userId: response.data.id } 
+        });
       }
     } catch (error) {
-      alert(error.response?.data?.detail || "Registration failed.");
+      console.error("Registration failed:", error);
+      alert(error.response?.data?.detail || "Registration failed. Please try again.");
     }
   };
 
@@ -46,7 +58,7 @@ const Register = () => {
     setFormData({ ...formData, [field]: value });
   };
 
-  // Tightened Styling Classes
+  // Styling Classes
   const inputContainer = "flex flex-col gap-1";
   const labelClass = "text-[9px] uppercase tracking-[0.2em] text-gray-500 font-bold ml-1";
   const inputClass = "w-full bg-[#0d0d0d] border border-white/5 text-white p-2.5 rounded-lg focus:border-green-500 focus:bg-[#151515] outline-none transition-all text-xs placeholder:text-gray-800";
@@ -54,7 +66,7 @@ const Register = () => {
   return (
     <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
       
-      {/* LEFT SIDE: Image Panel (Reduced to 30%) */}
+      {/* LEFT SIDE: Identity Panel (30% width) */}
       <div className="hidden lg:flex lg:w-[30%] relative flex-col justify-between p-10 overflow-hidden border-r border-white/5">
         <img 
           src={sideImage} 
@@ -65,7 +77,7 @@ const Register = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-8">
-            <div className="w-6 h-6 bg-green-600 rounded flex items-center justify-center">
+            <div className="w-6 h-6 bg-green-600 rounded flex items-center justify-center shadow-[0_0_15px_rgba(34,197,94,0.4)]">
               <div className="w-2 h-2 bg-white rounded-sm" />
             </div>
             <span className="font-black text-sm tracking-tighter uppercase">SecureRide</span>
@@ -74,27 +86,28 @@ const Register = () => {
           <h1 className="text-4xl font-black tracking-tighter leading-tight mb-4">
             Get Started <br /> <span className="text-gray-400">with Us</span>
           </h1>
+          <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Multi-Step Verification active</p>
         </div>
 
-        {/* Step Indicators (Smaller scale) */}
+        {/* Dynamic Progress Indicator */}
         <div className="relative z-10 flex flex-col gap-2">
           <div className="bg-white p-4 rounded-2xl w-full text-black shadow-xl">
             <span className="text-[8px] font-black mb-1 block uppercase">Step 01</span>
-            <p className="text-[10px] font-bold leading-tight">Create your secure account</p>
+            <p className="text-[10px] font-bold leading-tight tracking-tight">Create your secure account</p>
           </div>
           <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl w-full text-white/40">
-            <span className="text-[8px] font-black mb-1 block uppercase">Step 02</span>
-            <p className="text-[10px] font-bold leading-tight">Verify Identity</p>
+            <span className="text-[8px] font-black mb-1 block uppercase tracking-tighter opacity-50">Next Steps</span>
+            <p className="text-[10px] font-bold leading-tight opacity-50">Consent & Biometric Scan</p>
           </div>
         </div>
       </div>
 
-      {/* RIGHT SIDE: Form Panel (Expanded to 70% with independent scroll) */}
+      {/* RIGHT SIDE: Registry Form (70% width) */}
       <div className="w-full lg:w-[70%] bg-black p-6 md:p-12 lg:p-16 flex flex-col items-center overflow-y-auto custom-scrollbar">
         <div className="max-w-2xl w-full">
           <div className="mb-8">
             <h2 className="text-2xl font-black tracking-tight mb-1">Sign Up Account</h2>
-            <p className="text-gray-500 text-xs">Enter your details to create your secure profile.</p>
+            <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Personal Data Entry Terminal</p>
           </div>
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5">
@@ -180,7 +193,7 @@ const Register = () => {
 
             <div className="md:col-span-2 pt-4">
               <button type="submit" className="w-full bg-white text-black hover:bg-green-600 hover:text-white transition-all font-black py-3 rounded-lg text-xs shadow-xl active:scale-[0.98]">
-                SIGN UP
+                REGISTER & CONTINUE
               </button>
               
               <div className="mt-4 text-center">
@@ -196,6 +209,7 @@ const Register = () => {
         </div>
       </div>
 
+      {/* Internal CSS for scrollbar */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
