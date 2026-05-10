@@ -26,6 +26,7 @@ export const authAPI = {
   verifyLiveness: (userId) => api.post(`/auth/verify-liveness/${userId}`),
   getProfile: () => api.get('/auth/users/me'),
   updateProfile: (data) => api.put('/auth/users/me', data),
+     deleteAccount: () => api.delete('/auth/users/me'),
 };
 
 export const tripAPI = {

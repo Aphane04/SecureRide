@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Car, History, Phone, User, Map as MapIcon, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Car, History, Phone, User, Map as MapIcon, UserX, ChevronRight, ShieldCheck } from 'lucide-react';
 import { authAPI } from '../../utils/api';
 
 const PassengerDash = () => {
@@ -13,12 +13,24 @@ const PassengerDash = () => {
     });
   }, []);
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
+  // NEW: Logic to permanently delete the account
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "CRITICAL: Are you sure you want to permanently delete your account? This action cannot be undone and all biometric data will be purged."
+    );
+
+    if (confirmed) {
+      try {
+        await authAPI.deleteAccount();
+        localStorage.clear(); // Wipe tokens
+        alert("Account Deleted Successfully.");
+        navigate('/register'); // Send back to registration
+      } catch (err) {
+        alert("Action failed. Please try again later.");
+      }
+    }
   };
 
-  // Selection Logic: High-contrast black font, Selected state pops with gray background
   const navClass = ({ isActive }) =>
     `group flex items-center justify-between px-4 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 ${
       isActive 
@@ -29,10 +41,9 @@ const PassengerDash = () => {
   return (
     <div className="flex h-[calc(100vh-64px)] bg-white font-sans overflow-hidden text-black">
       
-      {/* SIDEBAR: Pure White */}
+      {/* SIDEBAR */}
       <aside className="w-72 bg-white border-r border-gray-200 p-8 flex flex-col justify-between z-20">
         <div>
-          {/* User Branding */}
           <div className="mb-12 px-2">
             <div className="flex items-center gap-2 mb-1 text-[#008751]">
                 <ShieldCheck size={14} />
@@ -83,20 +94,19 @@ const PassengerDash = () => {
           </nav>
         </div>
 
-        {/* Logout Bottom: Deep Red */}
+        {/* Updated Button: DELETE ACCOUNT (Deep Red) */}
         <div className="pt-6 border-t border-gray-50">
           <button 
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 text-[#991b1b] hover:text-[#7f1d1d] transition-all text-[11px] font-black uppercase tracking-widest hover:bg-red-50 rounded-xl w-full"
+            onClick={handleDeleteAccount}
+            className="flex items-center gap-3 px-4 py-3 text-[#991b1b] hover:text-white hover:bg-[#991b1b] transition-all text-[11px] font-black uppercase tracking-widest rounded-xl w-full"
           >
-            <LogOut size={18} /> Logout System
+            <UserX size={18} /> Delete Account
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA: Dim White (White-Greyish) */}
+      {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-auto bg-[#f3f4f6] p-6">
-        {/* Inner page container is pure white to make the content "pop" off the dim white background */}
         <div className="h-full w-full bg-white rounded-[2.5rem] border border-gray-200 overflow-hidden shadow-sm relative">
             <Outlet />
         </div>

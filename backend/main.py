@@ -344,3 +344,23 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
     ensure_admin(user)
     rows = db.query(models.Trip, models.User.email).join(models.User, models.Trip.passenger_id == models.User.id).all()
     return [{"id": t.id, "passenger_email": e, "pickup_location": t.pickup_location, "destination": t.destination, "fare": t.fare, "status": t.status, "start_time": t.start_time} for t, e in rows]
+
+@app.delete("/auth/users/me")
+def delete_current_user_account(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Permanently deletes the user account and all associated profile data.
+    """
+    try:
+        # Since we use relationships, we should ensure the profile is deleted too
+        # If you set up ondelete="CASCADE" in models.py, this is automatic.
+        # Otherwise, we do it manually here:
+        db.query(models.Profile).filter(models.Profile.user_id == user.id).delete()
+        
+        # Delete the main user record
+        db.delete(user)
+        db.commit()
+        
+        return {"message": "Account successfully terminated and data purged."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete account.")
