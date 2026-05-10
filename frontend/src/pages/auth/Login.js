@@ -25,7 +25,7 @@ const Login = () => {
       // Role-based redirection
       if (user.role === 'Admin') navigate('/dashboard/admin');
       else if (user.role === 'Driver') navigate('/dashboard/driver');
-      else navigate('/dashboard/passenger');
+      else navigate('/dashboard/passenger/ride');
     } catch (error) {
       alert(error.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {
