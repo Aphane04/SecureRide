@@ -39,7 +39,7 @@ export const tripAPI = {
   triggerAlert: (tripId, transcript) => api.post(`/trips/${tripId}/emergency`, { transcript }),
  getRideRequests: () => api.get('/trips/requests'),
   acceptRide: (tripId) => api.post(`/trips/${tripId}/accept`),
-
+  cancelTrip: (tripId) => api.post(`/trips/${tripId}/cancel`),
 };
 
 export const contactAPI = {

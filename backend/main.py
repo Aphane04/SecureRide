@@ -380,3 +380,17 @@ def delete_current_user_account(user: models.User = Depends(get_current_user), d
         db.rollback()
         print(f"❌ DELETE FAILED: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database constraint error: {str(e)}")
+    
+@app.post("/trips/{trip_id}/cancel")
+def cancel_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    
+    # Security: Ensure only the passenger who booked it (or an admin) can cancel it
+    if trip.passenger_id != user.id and user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Unauthorized to cancel this trip")
+
+    trip.status = "Canceled"
+    db.commit()
+    return {"message": "Trip canceled successfully"}
