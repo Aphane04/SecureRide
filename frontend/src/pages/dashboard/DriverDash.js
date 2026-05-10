@@ -94,7 +94,7 @@ const DriverDash = () => {
             onClick={handleDeleteAccount}
             className="flex items-center gap-3 px-4 py-3 text-[#991b1b] hover:text-white hover:bg-[#991b1b] transition-all text-[11px] font-black uppercase tracking-widest rounded-xl w-full"
           >
-            <UserX size={18} /> Delete  Account
+            <UserX size={18} /> Delete Account
           </button>
         </div>
       </aside>
