@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { History, Phone, User, Map as MapIcon, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
+import { History, Phone, User, Map as MapIcon, UserX, ChevronRight, ShieldCheck } from 'lucide-react';
 import { authAPI } from '../../utils/api';
 
 const DriverDash = () => {
@@ -13,12 +13,24 @@ const DriverDash = () => {
     });
   }, []);
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
+  // NEW: Logic to permanently delete the driver account
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "CRITICAL: Are you sure you want to permanently delete your Driver Account? This will purge your vehicle registry, trip history, and biometric data. This action is irreversible."
+    );
+
+    if (confirmed) {
+      try {
+        await authAPI.deleteAccount(); // Calls DELETE /auth/users/me
+        localStorage.clear(); // Wipe the JWT token
+        alert("Account Terminated Successfully.");
+        navigate('/register'); // Redirect to start
+      } catch (err) {
+        alert("System failed to process deletion. Please contact Admin.");
+      }
+    }
   };
 
-  // Selection Logic: Black font, Gray background for "pop", and Green active border
   const navClass = ({ isActive }) =>
     `group flex items-center justify-between px-4 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 ${
       isActive 
@@ -46,7 +58,6 @@ const DriverDash = () => {
           <nav className="space-y-1.5">
             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4 px-2">Operator Menu</p>
             
-            {/* Renamed Dashboard to Map */}
             <NavLink to="/dashboard/driver" end className={navClass}>
               <div className="flex items-center gap-3">
                 <MapIcon size={18} /> <span>Map</span>
@@ -77,20 +88,19 @@ const DriverDash = () => {
           </nav>
         </div>
 
-        {/* Logout Section: Deep Red Typography */}
+        {/* Action Bottom: Delete Account (Deep Red) */}
         <div className="pt-6 border-t border-gray-50">
           <button 
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 text-[#991b1b] hover:text-[#7f1d1d] transition-all text-[11px] font-black uppercase tracking-widest hover:bg-red-50 rounded-xl w-full"
+            onClick={handleDeleteAccount}
+            className="flex items-center gap-3 px-4 py-3 text-[#991b1b] hover:text-white hover:bg-[#991b1b] transition-all text-[11px] font-black uppercase tracking-widest rounded-xl w-full"
           >
-            <LogOut size={18} /> Logout Terminal
+            <UserX size={18} /> Delete Account
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA: Dim White (Greyish-white) */}
+      {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-auto bg-[#f3f4f6] p-6">
-        {/* Inner container is pure white to make the content pop against the grey background */}
         <div className="h-full w-full bg-white rounded-[2.5rem] border border-gray-200 overflow-hidden shadow-sm relative">
             <Outlet />
         </div>
