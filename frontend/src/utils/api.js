@@ -60,6 +60,7 @@ export const adminAPI = {
   drivers: () => api.get('/admin/drivers'),
   passengers: () => api.get('/admin/passengers'),
   alerts: () => api.get('/admin/alerts'),
+  getNotifications: () => api.get('/admin/notifications'),
 };
 
 export default api;

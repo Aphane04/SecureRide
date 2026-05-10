@@ -394,3 +394,27 @@ def cancel_trip(trip_id: int, user: models.User = Depends(get_current_user), db:
     trip.status = "Canceled"
     db.commit()
     return {"message": "Trip canceled successfully"}
+
+@app.get("/admin/notifications")
+def get_admin_notifications(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    
+    # 1. Define "Recent" (e.g., users who registered in the last 24 hours)
+    yesterday = datetime.utcnow() - timedelta(hours=24)
+    
+    # 2. Query new registrations
+    new_registrations = db.query(models.User).filter(
+        models.User.created_at >= yesterday
+    ).order_by(models.User.created_at.desc()).limit(10).all()
+    
+    notifications = []
+    for u in new_registrations:
+        notifications.append({
+            "id": u.id,
+            "type": "REGISTRATION",
+            "message": f"New {u.role} registered: {u.email}",
+            "time": u.created_at,
+            "role": u.role
+        })
+    
+    return notifications
