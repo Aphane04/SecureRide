@@ -345,22 +345,38 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
     rows = db.query(models.Trip, models.User.email).join(models.User, models.Trip.passenger_id == models.User.id).all()
     return [{"id": t.id, "passenger_email": e, "pickup_location": t.pickup_location, "destination": t.destination, "fare": t.fare, "status": t.status, "start_time": t.start_time} for t, e in rows]
 
+# Add/Update this in main.py
 @app.delete("/auth/users/me")
 def delete_current_user_account(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Permanently deletes the user account and all associated profile data.
-    """
     try:
-        # Since we use relationships, we should ensure the profile is deleted too
-        # If you set up ondelete="CASCADE" in models.py, this is automatic.
-        # Otherwise, we do it manually here:
-        db.query(models.Profile).filter(models.Profile.user_id == user.id).delete()
-        
-        # Delete the main user record
+        # 1. Delete all Trips associated with this user (as passenger OR driver)
+        db.query(models.Trip).filter(
+            or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id)
+        ).delete(synchronize_session=False)
+
+        # 2. Delete Emergency Contacts
+        db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == user.id).delete(synchronize_session=False)
+
+        # 3. Delete Profile
+        db.query(models.Profile).filter(models.Profile.user_id == user.id).delete(synchronize_session=False)
+
+        # 4. Delete Role-specific data (Passenger/Driver/Admin)
+        if user.role == "Passenger":
+            db.query(models.Passenger).filter(models.Passenger.user_id == user.id).delete(synchronize_session=False)
+        elif user.role == "Driver":
+            # Delete vehicle first if it exists
+            db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).delete(synchronize_session=False)
+            db.query(models.Driver).filter(models.Driver.user_id == user.id).delete(synchronize_session=False)
+        elif user.role == "Admin":
+            db.query(models.Admin).filter(models.Admin.user_id == user.id).delete(synchronize_session=False)
+
+        # 5. Finally, delete the User record
         db.delete(user)
-        db.commit()
         
-        return {"message": "Account successfully terminated and data purged."}
+        db.commit()
+        return {"message": "User and all associated security data purged successfully."}
+
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to delete account.")
+        print(f"❌ DELETE FAILED: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database constraint error: {str(e)}")
