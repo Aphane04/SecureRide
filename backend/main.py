@@ -419,30 +419,3 @@ def get_admin_notifications(user: models.User = Depends(get_current_user), db: S
     
     return notifications
 
-@app.post("/trips/{trip_id}/emergency")
-def trigger_trip_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
-    """
-    Called by the AI Monitor when danger keywords are detected.
-    Saves the transcript to the ai_safety_log table for the Admin to see.
-    """
-    # 1. Check if trip exists
-    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
-
-    # 2. Create the safety log
-    new_alert = models.AiSafetyLog(
-        trip_id=trip_id,
-        transcript=data.transcript
-    )
-    db.add(new_alert)
-    db.commit()
-    print(f"🚨 AI ALERT SAVED: Trip #{trip_id} - {data.transcript}")
-    return {"message": "Emergency alert logged and broadcasted to admin."}
-
-@app.get("/trips/history", response_model=List[schemas.TripOut])
-def get_trip_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Returns all trips for the logged-in passenger.
-    """
-    return db.query(models.Trip).filter(models.Trip.passenger_id == user.id).order_by(models.Trip.start_time.desc()).all()
