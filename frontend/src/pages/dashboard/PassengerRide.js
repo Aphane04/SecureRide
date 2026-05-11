@@ -3,7 +3,7 @@ import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, MarkerF } 
 import { useAiMonitor } from '../../utils/aiMonitor';
 import { 
   Shield, MapPin, Navigation, Search, Info, 
-  CreditCard, Ruler, Clock as ClockIcon, LocateFixed, XCircle 
+  CreditCard, Ruler, Clock as ClockIcon, LocateFixed, XCircle, Loader2
 } from 'lucide-react';
 import { tripAPI } from '../../utils/api';
 
@@ -67,20 +67,19 @@ const PassengerRide = () => {
   const handleCancelTrip = async () => {
     if (!activeTripId) return;
     if (!window.confirm("Do you want to stop this ride request?")) return;
-
     try {
       await tripAPI.cancelTrip(activeTripId);
       setActiveTripId(null);
       setActiveTripDetails(null);
       setDirectionsResponse(null);
-      setBookingMessage('Trip Canceled.');
+      setBookingMessage(''); // Clear message on cancel
       setFare(null);
       setDistance('');
       setDuration('');
       if (originRef.current) originRef.current.value = '';
       if (destinationRef.current) destinationRef.current.value = '';
     } catch (err) {
-      alert("Failed to cancel trip. It may already be accepted.");
+      alert("Failed to cancel trip.");
     }
   };
 
@@ -92,24 +91,17 @@ const PassengerRide = () => {
       destination: destinationRef.current.value,
       travelMode: window.google.maps.TravelMode.DRIVING,
     });
-
-    const distText = results.routes[0].legs[0].distance.text;
-    const durText = results.routes[0].legs[0].duration.text;
-
     setDirectionsResponse(results);
-    setDistance(distText);
-    setDuration(durText);
-
-    const km = parseDistanceKm(distText);
-    const mins = parseDurationMinutes(durText);
-    setDistanceKm(km);
-    setDurationMinutes(mins);
+    setDistance(results.routes[0].legs[0].distance.text);
+    setDuration(results.routes[0].legs[0].duration.text);
+    setDistanceKm(parseDistanceKm(results.routes[0].legs[0].distance.text));
+    setDurationMinutes(parseDurationMinutes(results.routes[0].legs[0].duration.text));
 
     const estimate = await tripAPI.estimateFare({
       pickup_location: originRef.current.value,
       destination: destinationRef.current.value,
-      distance_km: km,
-      duration_minutes: mins,
+      distance_km: parseDistanceKm(results.routes[0].legs[0].distance.text),
+      duration_minutes: parseDurationMinutes(results.routes[0].legs[0].duration.text),
     });
     setFare(estimate.data.estimated_fare);
   }
@@ -125,18 +117,28 @@ const PassengerRide = () => {
           fare: fare,
         });
         setActiveTripId(response.data.id);
-        setBookingMessage('Request Sent. Waiting for Driver...');
+        // Start the searching message immediately
+        setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
     } catch (err) { console.error(err); }
   };
 
+  // POLLING LOGIC FIXED:
   useEffect(() => {
     if (!activeTripId) return;
     const poll = async () => {
       try {
         const res = await tripAPI.getActiveTrip();
-        setActiveTripDetails(res.data);
-        setBookingMessage('Driver Match Confirmed');
-      } catch (err) {}
+        // If we get data, a driver has accepted
+        if (res.data) {
+            setActiveTripDetails(res.data);
+            setBookingMessage('DRIVER MATCHED! TRANSPORT EN ROUTE');
+        }
+      } catch (err) {
+        // If error is 404, driver hasn't accepted yet. We KEEP the searching message.
+        if (err.response?.status === 404) {
+            setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
+        }
+      }
     };
     poll();
     const timer = setInterval(poll, 5000);
@@ -155,8 +157,8 @@ const PassengerRide = () => {
     );
   }, [activeTripDetails, directionsResponse]);
 
-  if (loadError) return <div className="p-10 text-red-500 font-bold">Map System Error</div>;
-  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing Secure Maps...</div>;
+  if (loadError) return <div className="p-10 text-red-500 font-bold">Map Error</div>;
+  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing...</div>;
 
   const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400";
   const labelClass = "text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1";
@@ -164,7 +166,6 @@ const PassengerRide = () => {
   return (
     <div className="h-full bg-white flex flex-col font-sans">
       
-      {/* Map Section */}
       <div className="h-[52%] relative border-b border-gray-100">
         <GoogleMap center={center} zoom={15} mapContainerStyle={{ width: '100%', height: '100%' }} options={{ disableDefaultUI: true }}>
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
@@ -176,30 +177,28 @@ const PassengerRide = () => {
             <div className={`px-5 py-2.5 rounded-full flex items-center gap-3 border shadow-2xl transition-all ${dangerDetected ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-white border-gray-100 text-black'}`}>
               <div className={`w-2 h-2 rounded-full ${dangerDetected ? 'bg-white' : 'bg-[#008751] animate-ping'}`} />
               <span className="text-[10px] font-black uppercase tracking-widest">
-                {dangerDetected ? 'AI DANGER ALERT - CONTACTING LAW' : 'Live Trip Monitored'}
+                {dangerDetected ? 'AI DANGER ALERT' : 'Live Trip Monitored'}
               </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Control Panel */}
       <div className="h-[48%] p-8 bg-white overflow-y-auto custom-scrollbar">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black text-black tracking-tight flex items-center gap-2">
-                <Shield className="text-[#008751]" size={24} /> REQUEST RIDE
+            <h2 className="text-2xl font-black text-black tracking-tight flex items-center gap-2 uppercase">
+                <Shield className="text-[#008751]" size={24} /> Secure Ride
             </h2>
             
             <div className="flex items-center gap-3">
-                {/* CANCEL BUTTON: Functional and matching the white theme */}
                 {activeTripId && (
                     <button 
                         onClick={handleCancelTrip}
-                        className="bg-red-50 text-red-600 border border-red-100 px-4 py-1.5 rounded-full flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all group"
+                        className="bg-red-50 text-red-600 border border-red-100 px-4 py-1.5 rounded-full flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all"
                     >
-                        <XCircle size={14} className="group-hover:rotate-90 transition-transform" />
-                        <span className="text-[9px] font-black uppercase tracking-widest">Cancel Trip</span>
+                        <XCircle size={14} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">Cancel</span>
                     </button>
                 )}
                 <div className="bg-gray-100 px-4 py-1.5 rounded-full border border-gray-200 shadow-sm">
@@ -237,12 +236,24 @@ const PassengerRide = () => {
             <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
               Calculate Fare
             </button>
-            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">
+            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl">
               Request Transport
             </button>
           </div>
 
-          {distance && (
+          {/* SEARCHING LOADER UI: Displays only when searching */}
+          {activeTripId && !activeTripDetails && (
+            <div className="mb-8 p-6 bg-gray-50 border border-gray-100 rounded-[2rem] flex flex-col items-center justify-center animate-in fade-in duration-500">
+                <div className="relative mb-4">
+                    <div className="absolute inset-0 bg-green-500 blur-xl opacity-20 animate-pulse" />
+                    <Loader2 size={32} className="text-[#008751] animate-spin relative z-10" />
+                </div>
+                <p className="text-[11px] font-black text-black uppercase tracking-[0.3em] mb-1">Broadcasting Mission</p>
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Awaiting Pilot Confirmation...</p>
+            </div>
+          )}
+
+          {distance && !activeTripId && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-2">
               <ResultCard icon={<Ruler size={14}/>} label="Distance" value={distance} />
               <ResultCard icon={<ClockIcon size={14}/>} label="Duration" value={duration} />
@@ -253,7 +264,7 @@ const PassengerRide = () => {
 
           {bookingMessage && (
             <div className="mt-8 text-center border-t border-gray-50 pt-6">
-                <p className="text-[10px] font-black text-[#008751] uppercase tracking-[0.3em] animate-pulse">
+                <p className="text-[10px] font-black text-[#008751] uppercase tracking-[0.4em] animate-pulse">
                     {bookingMessage}
                 </p>
             </div>
