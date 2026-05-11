@@ -448,3 +448,15 @@ def get_trip_history(user: models.User = Depends(get_current_user), db: Session 
     Returns all trips for the logged-in passenger.
     """
     return db.query(models.Trip).filter(models.Trip.passenger_id == user.id).order_by(models.Trip.start_time.desc()).all()
+
+@app.get("/trips/driver-history", response_model=List[schemas.TripOut])
+def get_driver_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Returns all trips where the current user was the driver.
+    """
+    if user.role != "Driver":
+        raise HTTPException(status_code=403, detail="Only drivers can view this history.")
+        
+    return db.query(models.Trip).filter(
+        models.Trip.driver_id == user.id
+    ).order_by(models.Trip.start_time.desc()).all()

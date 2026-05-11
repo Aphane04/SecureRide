@@ -21,6 +21,7 @@ const DriverHistory = () => {
   useEffect(() => {
     const load = async () => {
       try {
+        // Calls the /trips/driver-history endpoint
         const res = await tripAPI.getDriverHistory();
         setTrips(res.data);
         setError('');
@@ -33,13 +34,14 @@ const DriverHistory = () => {
     load();
   }, []);
 
-  // Helper to color statuses
+  // Helper to color statuses professionally
   const getStatusStyle = (status) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'completed': return 'bg-green-50 text-green-600 border-green-100';
       case 'active': return 'bg-blue-50 text-blue-600 border-blue-100';
       case 'canceled': return 'bg-red-50 text-red-600 border-red-100';
-      default: return 'bg-gray-50 text-gray-600 border-gray-100';
+      case 'searching': return 'bg-orange-50 text-orange-600 border-orange-100';
+      default: return 'bg-gray-50 text-gray-500 border-gray-100';
     }
   };
 
@@ -51,28 +53,28 @@ const DriverHistory = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
           <div>
             <div className="flex items-center gap-2 mb-2 text-[#008751]">
-                <History size={18} />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Operational Logs</span>
+                <ShieldCheck size={18} />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Operator Logs</span>
             </div>
-            <h2 className="text-4xl font-black tracking-tighter text-black uppercase leading-none">Trip History</h2>
-            <p className="text-gray-400 text-xs mt-2 font-medium">Full archive of completed missions and security transfers.</p>
+            <h2 className="text-4xl font-black tracking-tighter text-black uppercase leading-none">Mission Archive</h2>
+            <p className="text-gray-400 text-xs mt-2 font-medium italic">Detailed record of all authorized driver assignments.</p>
           </div>
 
           <div className="bg-gray-50 px-6 py-4 rounded-[1.5rem] border border-gray-100 flex items-center gap-6 shadow-sm">
              <div className="text-center">
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Trips</p>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Assigned</p>
                 <p className="text-xl font-black text-black">{trips.length}</p>
              </div>
              <div className="w-px h-8 bg-gray-200" />
              <div className="text-center">
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Network</p>
                 <p className="text-xs font-bold text-green-600 uppercase">Synchronized</p>
              </div>
           </div>
         </div>
 
         {error && (
-          <div className="mb-8 bg-red-50 border border-red-100 p-4 rounded-xl flex items-center gap-3 text-red-600 text-xs font-bold">
+          <div className="mb-8 bg-red-50 border border-red-100 p-4 rounded-xl flex items-center gap-3 text-red-600 text-xs font-bold animate-pulse">
             <AlertCircle size={16} /> {error}
           </div>
         )}
@@ -80,7 +82,7 @@ const DriverHistory = () => {
         {loading ? (
             <div className="h-64 flex flex-col items-center justify-center text-gray-300">
                 <Clock className="animate-spin mb-4" size={32} />
-                <p className="text-[10px] font-black uppercase tracking-widest">Deciphering logs...</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Fetching local registry...</p>
             </div>
         ) : trips.length === 0 ? (
           <div className="h-96 border-2 border-dashed border-gray-100 rounded-[3rem] flex flex-col items-center justify-center text-gray-300">
@@ -93,9 +95,9 @@ const DriverHistory = () => {
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                   <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Route Logistics</th>
-                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaction</th>
-                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Security Status</th>
-                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Timestamp</th>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Earnings</th>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Status</th>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Completed At</th>
                   <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Action</th>
                 </tr>
               </thead>
@@ -105,14 +107,14 @@ const DriverHistory = () => {
                     <td className="p-6">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
-                            <span className="text-[11px] font-bold text-gray-500 truncate max-w-[200px] uppercase tracking-tighter">
+                            <MapPin size={10} className="text-gray-300" />
+                            <span className="text-[11px] font-bold text-gray-500 truncate max-w-[240px] uppercase tracking-tighter">
                                 {trip.pickup_location}
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-[#008751] rounded-full shadow-[0_0_5px_#008751]" />
-                            <span className="text-xs font-black text-black truncate max-w-[200px]">
+                            <Navigation size={10} className="text-[#008751]" />
+                            <span className="text-xs font-black text-black truncate max-w-[240px]">
                                 {trip.destination}
                             </span>
                         </div>
@@ -124,7 +126,7 @@ const DriverHistory = () => {
                             <Banknote size={14} className="text-gray-400" />
                             <span className="font-black text-sm text-[#008751]">R {trip.fare}</span>
                         </div>
-                        <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">Cash Transfer</p>
+                        <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">Cash Terminal</p>
                     </td>
 
                     <td className="p-6 text-center">
@@ -154,20 +156,11 @@ const DriverHistory = () => {
                 ))}
               </tbody>
             </table>
-            
-            {/* Table Footer */}
-            <div className="p-6 bg-gray-50/30 flex justify-between items-center">
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Authorized Fleet Document</p>
-                <div className="flex items-center gap-2">
-                    <button className="w-8 h-8 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-xs font-black shadow-sm">1</button>
-                    <ChevronRight size={14} className="text-gray-300" />
-                </div>
-            </div>
           </div>
         )}
 
         <div className="mt-20 border-t border-gray-100 pt-10 text-center opacity-30 grayscale">
-            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-black">SecureRide Central Registry Terminal</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-black text-center">SecureRide Operator Control Center</span>
         </div>
       </div>
     </div>
