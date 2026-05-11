@@ -3,7 +3,7 @@ import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, MarkerF } 
 import { useAiMonitor } from '../../utils/aiMonitor';
 import { 
   Shield, MapPin, Navigation, Search, Info, 
-  CreditCard, Ruler, Clock as ClockIcon, LocateFixed, XCircle, Loader2
+  CreditCard, Ruler, Clock as ClockIcon, LocateFixed, XCircle, Loader2, CheckCircle2
 } from 'lucide-react';
 import { tripAPI } from '../../utils/api';
 
@@ -72,15 +72,9 @@ const PassengerRide = () => {
       setActiveTripId(null);
       setActiveTripDetails(null);
       setDirectionsResponse(null);
-      setBookingMessage(''); // Clear message on cancel
+      setBookingMessage('');
       setFare(null);
-      setDistance('');
-      setDuration('');
-      if (originRef.current) originRef.current.value = '';
-      if (destinationRef.current) destinationRef.current.value = '';
-    } catch (err) {
-      alert("Failed to cancel trip.");
-    }
+    } catch (err) { alert("Failed to cancel trip."); }
   };
 
   async function calculateRoute() {
@@ -117,31 +111,37 @@ const PassengerRide = () => {
           fare: fare,
         });
         setActiveTripId(response.data.id);
-        // Start the searching message immediately
-        setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
+        // Step 1: Initial state after clicking button
+        setBookingMessage('BROADCASTING REQUEST TO NEARBY DRIVERS...');
     } catch (err) { console.error(err); }
   };
 
-  // POLLING LOGIC FIXED:
+  // POLLING LOGIC RE-ENGINEERED
   useEffect(() => {
     if (!activeTripId) return;
+
     const poll = async () => {
       try {
         const res = await tripAPI.getActiveTrip();
-        // If we get data, a driver has accepted
-        if (res.data) {
+        
+        // Check if the trip returned by the server matches our request AND is "Active"
+        if (res.data && res.data.id === activeTripId && res.data.status === 'Active') {
             setActiveTripDetails(res.data);
-            setBookingMessage('DRIVER MATCHED! TRANSPORT EN ROUTE');
+            setBookingMessage('DRIVER MATCH CONFIRMED! MISSION ACTIVE');
+        } else {
+            // Keep searching if status is still "Searching"
+            setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
         }
       } catch (err) {
-        // If error is 404, driver hasn't accepted yet. We KEEP the searching message.
+        // If 404, backend doesn't see an "Active" trip yet.
         if (err.response?.status === 404) {
             setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
         }
       }
     };
+
     poll();
-    const timer = setInterval(poll, 5000);
+    const timer = setInterval(poll, 4000); // Polling every 4 seconds
     return () => clearInterval(timer);
   }, [activeTripId]);
 
@@ -157,8 +157,8 @@ const PassengerRide = () => {
     );
   }, [activeTripDetails, directionsResponse]);
 
-  if (loadError) return <div className="p-10 text-red-500 font-bold">Map Error</div>;
-  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing...</div>;
+  if (loadError) return <div className="p-10 text-red-500 font-bold text-center uppercase tracking-widest">Map System Failure</div>;
+  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing Secure Maps...</div>;
 
   const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400";
   const labelClass = "text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1";
@@ -193,10 +193,7 @@ const PassengerRide = () => {
             
             <div className="flex items-center gap-3">
                 {activeTripId && (
-                    <button 
-                        onClick={handleCancelTrip}
-                        className="bg-red-50 text-red-600 border border-red-100 px-4 py-1.5 rounded-full flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all"
-                    >
+                    <button onClick={handleCancelTrip} className="bg-red-50 text-red-600 border border-red-100 px-4 py-1.5 rounded-full flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all">
                         <XCircle size={14} />
                         <span className="text-[9px] font-black uppercase tracking-widest">Cancel</span>
                     </button>
@@ -233,23 +230,34 @@ const PassengerRide = () => {
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
+            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm">
               Calculate Fare
             </button>
-            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl">
+            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">
               Request Transport
             </button>
           </div>
 
-          {/* SEARCHING LOADER UI: Displays only when searching */}
-          {activeTripId && !activeTripDetails && (
-            <div className="mb-8 p-6 bg-gray-50 border border-gray-100 rounded-[2rem] flex flex-col items-center justify-center animate-in fade-in duration-500">
-                <div className="relative mb-4">
-                    <div className="absolute inset-0 bg-green-500 blur-xl opacity-20 animate-pulse" />
-                    <Loader2 size={32} className="text-[#008751] animate-spin relative z-10" />
-                </div>
-                <p className="text-[11px] font-black text-black uppercase tracking-[0.3em] mb-1">Broadcasting Mission</p>
-                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Awaiting Pilot Confirmation...</p>
+          {/* DYNAMIC STATUS DISPLAY */}
+          {activeTripId && (
+            <div className="mb-8 p-8 border border-gray-100 rounded-[2.5rem] bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-700">
+               {activeTripDetails ? (
+                  <>
+                    <div className="bg-[#008751]/10 p-4 rounded-full mb-4">
+                        <CheckCircle2 size={40} className="text-[#008751]" />
+                    </div>
+                    <p className="text-sm font-black text-black uppercase tracking-tight">Driver Identified</p>
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center">
+                        Secure pickup en route to {activeTripDetails.pickup_location}
+                    </p>
+                  </>
+               ) : (
+                  <>
+                    <Loader2 size={40} className="text-[#008751] animate-spin mb-4" />
+                    <p className="text-sm font-black text-black uppercase tracking-tight">Searching for Driver</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">AI Protocol: Scanning local network...</p>
+                  </>
+               )}
             </div>
           )}
 
@@ -259,14 +267,6 @@ const PassengerRide = () => {
               <ResultCard icon={<ClockIcon size={14}/>} label="Duration" value={duration} />
               <ResultCard icon={<CreditCard size={14}/>} label="Payment" value="Cash" />
               <ResultCard icon={<Info size={14}/>} label="Estimated Fare" value={`R ${fare}`} isGreen={true} />
-            </div>
-          )}
-
-          {bookingMessage && (
-            <div className="mt-8 text-center border-t border-gray-50 pt-6">
-                <p className="text-[10px] font-black text-[#008751] uppercase tracking-[0.4em] animate-pulse">
-                    {bookingMessage}
-                </p>
             </div>
           )}
         </div>
