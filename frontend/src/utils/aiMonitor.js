@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { tripAPI } from './api';
 
-// Broadened list to catch natural speech variations
 const DANGER_WORDS = [
   "help", "stop the car", "stop", "don't touch me", "dont touch", 
   "police", "no no", "where are you taking me", "let me out", 
@@ -10,45 +9,46 @@ const DANGER_WORDS = [
 
 export const useAiMonitor = (activeTripId) => {
   const [dangerDetected, setDangerDetected] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  const isComponentMounted = useRef(true);
 
   useEffect(() => {
-    // Only monitor if there is an active trip
-    if (!activeTripId) return;
+    isComponentMounted.current = true;
+    
+    // Only start if we have a trip and haven't already hit an alert
+    if (!activeTripId || dangerDetected) return;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
     if (!SpeechRecognition) {
-      console.error("AI MONITOR: This browser does not support Speech Recognition.");
+      console.error("AI MONITOR: Browser not supported.");
       return;
     }
 
     const startRecognition = () => {
+      // If an instance already exists, stop it before making a new one
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
-      recognition.interimResults = false; // Only final processed text
       recognition.lang = 'en-US';
 
       recognition.onstart = () => {
-        setIsListening(true);
         console.log("🛡️ AI Monitor: Security Ear Active...");
       };
 
       recognition.onresult = async (event) => {
-        const lastResultIndex = event.results.length - 1;
-        const transcript = event.results[lastResultIndex][0].transcript.toLowerCase();
-        const confidence = event.results[lastResultIndex][0].confidence;
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        const confidence = event.results[event.results.length - 1][0].confidence;
 
-        // Check for danger words if AI is at least 50% sure of what it heard
-        if (confidence > 0.5) {
+        if (confidence > 0.4) {
           const containsDanger = DANGER_WORDS.some(word => transcript.includes(word));
 
           if (containsDanger) {
             setDangerDetected(true);
-            console.warn(`🚨 AI ALERT: "${transcript}" (Confidence: ${Math.round(confidence * 100)}%)`);
+            console.warn(`🚨 AI ALERT: ${transcript}`);
             
-            // Trigger Backend Emergency Protocol
             try {
               await tripAPI.triggerAlert(activeTripId, transcript);
             } catch (error) {
@@ -59,39 +59,43 @@ export const useAiMonitor = (activeTripId) => {
       };
 
       recognition.onerror = (event) => {
-        console.error("AI MONITOR ERROR:", event.error);
-        if (event.error === 'not-allowed') {
-          alert("Safety Monitor: Please allow microphone access for trip security.");
+        // We ignore 'aborted' errors as they are caused by the system resetting
+        if (event.error !== 'aborted') {
+          console.error("AI MONITOR ERROR:", event.error);
         }
       };
 
       recognition.onend = () => {
-        setIsListening(false);
-        // Safety Restart: If the trip is still active, start listening again after a short pause
-        if (activeTripId && !dangerDetected) {
+        // Only restart if the component is still alive and no danger was found
+        if (isComponentMounted.current && !dangerDetected && activeTripId) {
           setTimeout(() => {
             try {
               recognition.start();
             } catch (e) {
-              console.log("Recognition already running.");
+              // Silently catch "already started" errors
             }
           }, 1000);
         }
       };
 
       recognitionRef.current = recognition;
-      recognition.start();
+      
+      try {
+        recognition.start();
+      } catch (e) {
+        console.log("Recognition start skipped: Already running.");
+      }
     };
 
     startRecognition();
 
-    // Cleanup when trip ends or component unmounts
     return () => {
+      isComponentMounted.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
     };
-  }, [activeTripId, dangerDetected]);
+  }, [activeTripId, dangerDetected]); // This now handles resets safely
 
-  return { dangerDetected, isListening };
+  return { dangerDetected };
 };
