@@ -422,25 +422,26 @@ def get_admin_notifications(user: models.User = Depends(get_current_user), db: S
 # --- Add these to your main.py ---
 
 @app.post("/trips/{trip_id}/emergency")
-def trigger_trip_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
+def trigger_ai_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
     """
-    Called by the AI Monitor when danger keywords are detected.
-    Saves the transcript to the ai_safety_log table for the Admin to see.
+    RECEIVES alerts from the AI Monitor.
+    Saves the transcript into the ai_safety_log table.
     """
-    # 1. Check if trip exists
+    # 1. Verify trip exists
     trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise HTTPException(status_code=404, detail="Trip reference not found")
 
-    # 2. Create the safety log
-    new_alert = models.AiSafetyLog(
+    # 2. Log the danger transcript
+    new_log = models.AiSafetyLog(
         trip_id=trip_id,
         transcript=data.transcript
     )
-    db.add(new_alert)
+    db.add(new_log)
     db.commit()
-    print(f"🚨 AI ALERT SAVED: Trip #{trip_id} - {data.transcript}")
-    return {"message": "Emergency alert logged and broadcasted to admin."}
+    
+    print(f"🚨 SECURITY BREACH LOGGED: Trip {trip_id}")
+    return {"status": "alert_broadcasted"}
 
 @app.get("/trips/history", response_model=List[schemas.TripOut])
 def get_trip_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -460,3 +461,9 @@ def get_driver_history(user: models.User = Depends(get_current_user), db: Sessio
     return db.query(models.Trip).filter(
         models.Trip.driver_id == user.id
     ).order_by(models.Trip.start_time.desc()).all()
+
+@app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
+def get_all_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    # Return all alerts, newest first
+    return db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all()

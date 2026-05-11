@@ -64,16 +64,12 @@ const PassengerRide = () => {
     );
   };
 
-  // NEW FEATURE: Cancel Trip Logic
   const handleCancelTrip = async () => {
     if (!activeTripId) return;
     if (!window.confirm("Do you want to stop this ride request?")) return;
 
     try {
-      // Logic: Tell backend to stop the request
       await tripAPI.cancelTrip(activeTripId);
-      
-      // Reset UI
       setActiveTripId(null);
       setActiveTripDetails(null);
       setDirectionsResponse(null);
@@ -168,6 +164,7 @@ const PassengerRide = () => {
   return (
     <div className="h-full bg-white flex flex-col font-sans">
       
+      {/* Map Section */}
       <div className="h-[52%] relative border-b border-gray-100">
         <GoogleMap center={center} zoom={15} mapContainerStyle={{ width: '100%', height: '100%' }} options={{ disableDefaultUI: true }}>
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
@@ -186,6 +183,7 @@ const PassengerRide = () => {
         </div>
       </div>
 
+      {/* Control Panel */}
       <div className="h-[48%] p-8 bg-white overflow-y-auto custom-scrollbar">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-6">
@@ -193,8 +191,8 @@ const PassengerRide = () => {
                 <Shield className="text-[#008751]" size={24} /> REQUEST RIDE
             </h2>
             
-            {/* Action Section next to Safety Tier */}
             <div className="flex items-center gap-3">
+                {/* CANCEL BUTTON: Functional and matching the white theme */}
                 {activeTripId && (
                     <button 
                         onClick={handleCancelTrip}
@@ -218,7 +216,7 @@ const PassengerRide = () => {
                 <Autocomplete className="w-full">
                   <input ref={originRef} placeholder="Pickup Address" className={inputClass} />
                 </Autocomplete>
-                <button onClick={handleUseCurrentLocation} disabled={isLocating} className="absolute right-3 top-2.5 p-1 hover:bg-gray-200 rounded-md transition-colors text-[#008751]">
+                <button onClick={handleUseCurrentLocation} disabled={isLocating} className="absolute right-3 top-2.5 p-1 hover:bg-gray-200 rounded-md text-[#008751]">
                   <LocateFixed size={18} className={isLocating ? 'animate-spin opacity-50' : ''} />
                 </button>
               </div>
@@ -236,10 +234,10 @@ const PassengerRide = () => {
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-              <Search size={16}/> Calculate Fare
+            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
+              Calculate Fare
             </button>
-            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2">
+            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">
               Request Transport
             </button>
           </div>
