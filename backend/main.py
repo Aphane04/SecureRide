@@ -349,37 +349,45 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
 @app.delete("/auth/users/me")
 def delete_current_user_account(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
-        # 1. Delete all Trips associated with this user (as passenger OR driver)
+        # 1. Find all trip IDs where this user was a driver or passenger
+        user_trip_ids = [t.id for t in db.query(models.Trip).filter(
+            or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id)
+        ).all()]
+
+        # 2. DELETE AI SAFETY LOGS (The most likely blocker)
+        if user_trip_ids:
+            db.query(models.AiSafetyLog).filter(models.AiSafetyLog.trip_id.in_(user_trip_ids)).delete(synchronize_session=False)
+
+        # 3. DELETE TRIPS
         db.query(models.Trip).filter(
             or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id)
         ).delete(synchronize_session=False)
 
-        # 2. Delete Emergency Contacts
+        # 4. DELETE EMERGENCY CONTACTS
         db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == user.id).delete(synchronize_session=False)
 
-        # 3. Delete Profile
-        db.query(models.Profile).filter(models.Profile.user_id == user.id).delete(synchronize_session=False)
-
-        # 4. Delete Role-specific data (Passenger/Driver/Admin)
-        if user.role == "Passenger":
-            db.query(models.Passenger).filter(models.Passenger.user_id == user.id).delete(synchronize_session=False)
-        elif user.role == "Driver":
-            # Delete vehicle first if it exists
+        # 5. DELETE VEHICLE (If Driver)
+        if user.role == "Driver":
             db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).delete(synchronize_session=False)
             db.query(models.Driver).filter(models.Driver.user_id == user.id).delete(synchronize_session=False)
+
+        # 6. DELETE PROFILE & ROLE DATA
+        db.query(models.Profile).filter(models.Profile.user_id == user.id).delete(synchronize_session=False)
+        if user.role == "Passenger":
+            db.query(models.Passenger).filter(models.Passenger.user_id == user.id).delete(synchronize_session=False)
         elif user.role == "Admin":
             db.query(models.Admin).filter(models.Admin.user_id == user.id).delete(synchronize_session=False)
 
-        # 5. Finally, delete the User record
+        # 7. FINALLY DELETE THE USER
         db.delete(user)
-        
         db.commit()
-        return {"message": "User and all associated security data purged successfully."}
+        
+        return {"message": "Purge Complete"}
 
     except Exception as e:
         db.rollback()
-        print(f"❌ DELETE FAILED: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database constraint error: {str(e)}")
+        print(f"❌ DELETION ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database Lock: {str(e)}")
     
 @app.post("/trips/{trip_id}/cancel")
 def cancel_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):

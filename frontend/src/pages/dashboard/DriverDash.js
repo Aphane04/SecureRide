@@ -16,17 +16,19 @@ const DriverDash = () => {
   // NEW: Logic to permanently delete the driver account
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
-      "CRITICAL: Are you sure you want to permanently delete your Driver Account? This will purge your vehicle registry, trip history, and biometric data. This action is irreversible."
+      "CRITICAL: Are you sure you want to permanently delete your Driver Account? This will purge all records. This cannot be undone."
     );
 
     if (confirmed) {
       try {
-        await authAPI.deleteAccount(); // Calls DELETE /auth/users/me
-        localStorage.clear(); // Wipe the JWT token
-        alert("Account Terminated Successfully.");
-        navigate('/register'); // Redirect to start
+        await authAPI.deleteAccount();
+        localStorage.clear();
+        alert("Account Terminated.");
+        window.location.href = '/register'; // Using href for a clean hard-redirect
       } catch (err) {
-        alert("System failed to process deletion. Please contact Admin.");
+        // Show the actual reason for failure
+        const reason = err.response?.data?.detail || "Unknown Server Error";
+        alert(`System Error: ${reason}. Please contact system administrator.`);
       }
     }
   };
