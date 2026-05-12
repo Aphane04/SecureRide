@@ -47,9 +47,9 @@ const AdminDrivers = () => {
             <h2 className="text-3xl font-bold tracking-tight mb-1 text-white">Driver Management</h2>
             <p className="text-gray-500 text-sm font-medium">{drivers.length} Authorized fleet operators</p>
           </div>
-          <button className="bg-[#b39ddb] hover:bg-[#9575cd] text-[#1a1a1a] px-6 py-2.5 rounded-full text-xs font-black flex items-center gap-2 transition-all">
+         {/*} <button className="bg-[#b39ddb] hover:bg-[#9575cd] text-[#1a1a1a] px-6 py-2.5 rounded-full text-xs font-black flex items-center gap-2 transition-all">
             <Plus size={16} /> ADD NEW DRIVER
-          </button>
+          </button>*/}
         </div>
 
         {/* 2. White Table */}
@@ -95,7 +95,7 @@ const AdminDrivers = () => {
                   </td>
                   <td className="p-5">
                     <div className="flex items-center justify-center gap-2">
-                      <button className="bg-[#e8f5e9] text-[#2e7d32] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#2e7d32] hover:text-white transition">NOTES</button>
+                     {/* <button className="bg-[#e8f5e9] text-[#2e7d32] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#2e7d32] hover:text-white transition">NOTES</button>*/}
                       <button 
                         onClick={() => setSelectedDriver(d)}
                         className="bg-[#ede7f6] text-[#5e35b1] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#5e35b1] hover:text-white transition"
@@ -175,10 +175,10 @@ const AdminDrivers = () => {
                 </div>
               </div>
 
-              <div className="mt-12 flex gap-4">
+              {/*<div className="mt-12 flex gap-4">
                 <button className="bg-[#5e35b1] text-white px-10 py-3.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-[#4527a0] transition">Authorize Driver</button>
                 <button className="border border-red-100 text-red-500 px-10 py-3.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-red-50 transition">Reject Request</button>
-              </div>
+              </div>*/}
             </div>
           </div>
         </div>
