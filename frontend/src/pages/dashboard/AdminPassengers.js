@@ -37,19 +37,19 @@ const AdminPassengers = () => {
             <p className="text-gray-500 text-sm font-medium">{passengers.length} Total registered passengers</p>
           </div>
           <button className="bg-[#b39ddb] hover:bg-[#9575cd] text-[#1a1a1a] px-6 py-2.5 rounded-full text-xs font-black flex items-center gap-2 transition-all shadow-lg">
-            <Plus size={16} /> ADD NEW LOG
+            <Plus size={16} /> {/*ADD NEW LOGIC TO THIS BUTTON IN FUTURE*/}
           </button>
         </div>
 
         {/* 2. Filter Bar */}
-        <div className="flex items-center gap-3 mb-8">
+       {/* <div className="flex items-center gap-3 mb-8">
           <FilterDropdown label="Status" />
           <FilterDropdown label="Account Type" />
           <FilterDropdown label="Gender" />
           <div className="flex-1" />
           <button className="p-2 text-gray-500 hover:text-white"><Search size={20}/></button>
           <button className="p-2 text-gray-500 hover:text-white"><Download size={20}/></button>
-        </div>
+        </div>*/}
 
         {/* 3. The White Table Container */}
         <div className="bg-white rounded-[2rem] overflow-hidden shadow-2xl min-h-[400px]">
@@ -94,7 +94,7 @@ const AdminPassengers = () => {
                     </td>
                     <td className="p-5">
                       <div className="flex items-center justify-center gap-2">
-                        <button className="bg-[#e8f5e9] text-[#2e7d32] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#2e7d32] hover:text-white transition">NOTES</button>
+                       {/* <button className="bg-[#e8f5e9] text-[#2e7d32] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#2e7d32] hover:text-white transition">NOTES</button>*/}
                         <button 
                           onClick={() => setSelectedPassenger(p)}
                           className="bg-[#ede7f6] text-[#5e35b1] px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest hover:bg-[#5e35b1] hover:text-white transition"
@@ -143,10 +143,10 @@ const AdminPassengers = () => {
                   <InfoItem icon={<Clock size={12}/>} label="Registry Date" value={new Date(selectedPassenger.created_at).toLocaleDateString()} />
                </div>
 
-               <div className="mt-16 pt-8 border-t border-gray-100 flex gap-4">
+              {/* <div className="mt-16 pt-8 border-t border-gray-100 flex gap-4">
                   <button className="bg-[#5e35b1] text-white px-10 py-3.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">Approve Access</button>
                   <button className="border border-red-100 text-red-500 px-10 py-3.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-50">Flag Record</button>
-               </div>
+               </div>*/}
             </div>
           </div>
         </div>
