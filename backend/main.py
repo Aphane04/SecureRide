@@ -462,8 +462,47 @@ def get_driver_history(user: models.User = Depends(get_current_user), db: Sessio
         models.Trip.driver_id == user.id
     ).order_by(models.Trip.start_time.desc()).all()
 
-@app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
-def get_all_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+@app.get("/admin/alerts")
+def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
-    # Return all alerts, newest first
-    return db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all()
+    
+    # Query logs and join with all related safety data
+    logs = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all()
+    
+    result = []
+    for log in logs:
+        # Get Trip Details
+        trip = db.query(models.Trip).filter(models.Trip.id == log.trip_id).first()
+        if not trip: continue
+        
+        # Get Passenger Info
+        p_user = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
+        p_profile = p_user.profile if p_user else None
+        p_contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == trip.passenger_id).all()
+        
+        # Get Driver Info
+        d_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
+        d_profile = d_user.profile if d_user else None
+        
+        result.append({
+            "id": log.id,
+            "transcript": log.transcript,
+            "detected_at": log.detected_at,
+            "trip": {
+                "id": trip.id,
+                "pickup": trip.pickup_location,
+                "destination": trip.destination,
+                "status": trip.status
+            },
+            "passenger": {
+                "name": p_profile.full_name if p_profile else "Unknown",
+                "phone": p_profile.phone if p_profile else "N/A",
+                "email": p_user.email if p_user else "N/A",
+                "contacts": [{"name": c.name, "phone": c.phone} for c in p_contacts]
+            },
+            "driver": {
+                "name": d_profile.full_name if d_profile else "Unknown",
+                "phone": d_profile.phone if d_profile else "N/A"
+            }
+        })
+    return result
