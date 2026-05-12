@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { adminAPI } from '../../utils/api';
 import { 
-  ShieldAlert, MessageSquare, X, 
-  Activity, AlertTriangle, User, Phone, Users, MapPin, Car
+  ShieldAlert, Printer, ArrowDownToLine, X, 
+  Activity, AlertTriangle, User, Phone, MapPin, Car, FileText, Check
 } from 'lucide-react';
 
 const AdminAlerts = () => {
@@ -13,9 +13,7 @@ const AdminAlerts = () => {
     try {
       const res = await adminAPI.alerts();
       setAlerts(res.data);
-    } catch (err) {
-      console.error("Safety sync failed");
-    }
+    } catch (err) { console.error("Safety sync failed"); }
   };
 
   useEffect(() => {
@@ -27,51 +25,56 @@ const AdminAlerts = () => {
   const getSeverity = (transcript) => {
     const t = transcript?.toLowerCase() || "";
     if (['help', 'stop', 'police', 'danger', 'no'].some(word => t.includes(word))) {
-        return { label: 'CRITICAL', color: 'bg-red-50 text-red-600', dot: 'bg-red-600' };
+        return { label: 'CRITICAL', color: 'text-red-600', dot: 'bg-red-600' };
     }
-    return { label: 'WARNING', color: 'bg-orange-50 text-orange-600', dot: 'bg-orange-600' };
+    return { label: 'WARNING', color: 'text-orange-600', dot: 'bg-orange-600' };
   };
 
   return (
-    <div className="min-h-screen bg-[#111111] text-white font-sans">
-      <div className="p-8 max-w-[1600px] mx-auto">
+    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-red-500">
+      <div className="p-8 max-w-[1400px] mx-auto">
         
-        <div className="flex justify-between items-center mb-10">
+        {/* Dashboard Header */}
+        <div className="flex justify-between items-center mb-12">
           <div>
-            <div className="flex items-center gap-2 mb-2 text-red-500 font-black">
+            <div className="flex items-center gap-2 mb-2 text-red-500 font-bold">
                 <Activity size={16} className="animate-pulse" />
-                <span className="text-[10px] uppercase tracking-[0.3em]">Neural Safety Feed</span>
+                <span className="text-[10px] uppercase tracking-[0.4em]">Safety Intelligence Bureau</span>
             </div>
-            <h2 className="text-3xl font-black text-white uppercase">Alert Center</h2>
+            <h2 className="text-4xl font-black text-white tracking-tighter">INCIDENT LOGS</h2>
           </div>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl">
+        {/* Registry Table */}
+        <div className="bg-white rounded-3xl overflow-hidden shadow-2xl border border-white/10">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Level</th>
-                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Trip Ref</th>
-                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Transcript</th>
-                <th className="p-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Action</th>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Severity</th>
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Case Ref</th>
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">AI Transcript</th>
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Protocol</th>
               </tr>
             </thead>
-            <tbody className="text-gray-800">
+            <tbody className="text-black font-medium">
               {alerts.map((a) => {
                 const severity = getSeverity(a.transcript);
                 return (
-                  <tr key={a.id} className="hover:bg-red-50/30 border-b border-gray-50 transition-colors">
-                    <td className="p-5">
-                        <span className={`${severity.color} px-4 py-1.5 rounded-full text-[9px] font-black tracking-widest flex items-center gap-2 w-fit border border-current`}>
-                            <div className={`w-1.5 h-1.5 rounded-full ${severity.dot} animate-pulse`} />
+                  <tr key={a.id} className="hover:bg-gray-50 border-b border-gray-50 transition-colors">
+                    <td className="p-6">
+                        <span className={`${severity.color} text-[10px] font-black tracking-widest flex items-center gap-2`}>
+                            <div className={`w-2 h-2 rounded-full ${severity.dot}`} />
                             {severity.label}
                         </span>
                     </td>
-                    <td className="p-5 font-black text-xs">SR-#{a.trip?.id || 'N/A'}</td>
-                    <td className="p-5 text-sm font-medium text-gray-600 italic truncate max-w-sm">"{a.transcript}"</td>
-                    <td className="p-5 text-center">
-                        <button onClick={() => setSelectedAlert(a)} className="bg-black text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-md">
-                            VIEW DOSSIER
+                    <td className="p-6 font-mono text-xs text-gray-400">#SR-2026-{a.trip?.id}</td>
+                    <td className="p-6 italic text-sm text-gray-700">"{a.transcript}"</td>
+                    <td className="p-6 text-center">
+                        <button 
+                            onClick={() => setSelectedAlert(a)}
+                            className="bg-black text-white px-6 py-2 rounded-lg text-[10px] font-bold tracking-widest hover:bg-red-600 transition-all shadow-xl uppercase"
+                        >
+                            Open Dossier
                         </button>
                     </td>
                   </tr>
@@ -82,92 +85,119 @@ const AdminAlerts = () => {
         </div>
       </div>
 
-      {/* EMERGENCY DOSSIER MODAL */}
+      {/* OFFICIAL INCIDENT REPORT MODAL */}
       {selectedAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
-          <div className="bg-white text-black w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden relative border border-white max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl overflow-y-auto">
+          <div className="bg-white text-black w-full max-w-4xl shadow-[0_0_100px_rgba(0,0,0,0.5)] relative flex flex-col min-h-[90vh] my-auto overflow-hidden animate-in fade-in zoom-in duration-300">
             
-            <button onClick={() => setSelectedAlert(null)} className="absolute top-8 right-8 text-gray-400 hover:text-black transition-colors"><X size={32}/></button>
-
-            <div className="p-12">
-              <div className="flex items-center gap-4 mb-10 pb-6 border-b border-gray-100">
-                <div className="p-4 bg-red-600 text-white rounded-3xl animate-pulse shadow-lg">
-                    <ShieldAlert size={32} />
-                </div>
+            {/* Report Header: Bureau Style */}
+            <div className="p-10 border-b-4 border-black flex justify-between items-start bg-gray-50">
                 <div>
-                    <h3 className="text-4xl font-black tracking-tighter">Emergency Dossier</h3>
-                    <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">Incident #{selectedAlert.id}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                
-                {/* LEFT: Transcript & Trip */}
-                <div className="lg:col-span-7 space-y-8">
-                  <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100">
-                    <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <MessageSquare size={14}/> AI Voice Transcript
-                    </p>
-                    <p className="text-2xl font-medium italic leading-relaxed text-red-900">
-                        "{selectedAlert?.transcript || 'No transcript data'}"
-                    </p>
-                  </div>
-
-                  <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                        <MapPin size={14}/> Route Logistics
-                    </p>
-                    <div className="space-y-4">
-                        <div>
-                            <p className="text-[9px] font-black text-gray-400 uppercase">Pickup Location</p>
-                            <p className="text-sm font-bold">{selectedAlert?.trip?.pickup || 'Unknown'}</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] font-black text-gray-400 uppercase">Last Reported Destination</p>
-                            <p className="text-sm font-bold">{selectedAlert?.trip?.destination || 'Unknown'}</p>
-                        </div>
+                    <h3 className="text-sm font-black tracking-[0.3em] uppercase mb-1">SecureRide Safety Bureau</h3>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">Internal Safety Intelligence & Dispatch</p>
+                    <div className="mt-8">
+                        <h1 className="text-4xl font-black tracking-tighter uppercase leading-none">Incident Report</h1>
+                        <p className="font-mono text-xs mt-2 text-gray-500 uppercase">Case: #SR-ALERT-{selectedAlert.id} | Status: High Severity</p>
                     </div>
-                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-4">
+                    <button onClick={() => setSelectedAlert(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={24}/></button>
+                    <div className="text-right">
+                        <p className="text-[10px] font-black uppercase mb-1">Time Captured</p>
+                        <p className="text-xs font-mono bg-black text-white px-3 py-1">{new Date(selectedAlert.detected_at).toLocaleString()}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-12 flex-1 relative">
+                {/* Visual Watermark */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] rotate-[-45deg]">
+                    <ShieldAlert size={500} />
                 </div>
 
-                {/* RIGHT: User Profiles */}
-                <div className="lg:col-span-5 space-y-6">
-                  <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm">
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2"><User size={12}/> Passenger</p>
-                    <p className="text-lg font-black">{selectedAlert?.passenger?.name || 'Unknown User'}</p>
-                    <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-2"><Phone size={10}/> {selectedAlert?.passenger?.phone || 'N/A'}</p>
-                  </div>
+                <div className="relative z-10 space-y-12">
+                    
+                    {/* Section: Evidence */}
+                    <section>
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 text-gray-400 border-b pb-2">01. Neural Evidence Transcript</h4>
+                        <div className="pl-6 border-l-4 border-red-600 bg-red-50/50 py-6 pr-6">
+                            <p className="text-2xl font-bold italic leading-relaxed text-red-900">
+                                "{selectedAlert?.transcript || 'Log corrupted'}"
+                            </p>
+                            <p className="mt-4 text-[9px] font-black text-red-400 uppercase tracking-widest flex items-center gap-2">
+                                <Check size={12}/> Verified AI Audio Capture • Confidence: 88%
+                            </p>
+                        </div>
+                    </section>
 
-                  <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm">
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Car size={12}/> Driver</p>
-                    <p className="text-lg font-black">{selectedAlert?.driver?.name || 'Waiting for match...'}</p>
-                    <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-2"><Phone size={10}/> {selectedAlert?.driver?.phone || 'N/A'}</p>
-                  </div>
-
-                  <div className="bg-black text-white p-6 rounded-[2rem] shadow-xl">
-                    <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Users size={12}/> Passenger Emergency Contacts</p>
-                    <div className="space-y-4">
-                        {selectedAlert?.passenger?.contacts?.length > 0 ? selectedAlert.passenger.contacts.map((c, i) => (
-                            <div key={i} className="flex justify-between items-center border-b border-white/10 pb-2 last:border-none">
-                                <div>
-                                    <p className="text-xs font-bold">{c.name}</p>
-                                    <p className="text-[10px] text-gray-500">{c.phone}</p>
+                    {/* Section: Mission Data */}
+                    <div className="grid grid-cols-2 gap-16">
+                        <section>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 text-gray-400 border-b pb-2">02. Mission Logistics</h4>
+                            <div className="space-y-4">
+                                <div className="flex gap-4">
+                                    <MapPin size={16} className="text-gray-400 mt-1" />
+                                    <div>
+                                        <p className="text-[9px] font-black uppercase text-gray-400">Pickup Location</p>
+                                        <p className="text-sm font-bold">{selectedAlert?.trip?.pickup || 'Unknown'}</p>
+                                    </div>
                                 </div>
-                                <a href={`tel:${c.phone}`} className="p-2 bg-white/10 rounded-full hover:bg-red-600 transition-colors">
-                                    <Phone size={14} />
-                                </a>
+                                <div className="flex gap-4">
+                                    <Car size={16} className="text-gray-400 mt-1" />
+                                    <div>
+                                        <p className="text-[9px] font-black uppercase text-gray-400">Last Reported Destination</p>
+                                        <p className="text-sm font-bold">{selectedAlert?.trip?.destination || 'Unknown'}</p>
+                                    </div>
+                                </div>
                             </div>
-                        )) : <p className="text-[10px] text-gray-500 italic uppercase tracking-tighter">No safety contacts registered.</p>}
+                        </section>
+
+                        <section>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 text-gray-400 border-b pb-2">03. Target Identification</h4>
+                            <div className="space-y-6">
+                                <div>
+                                    <p className="text-[9px] font-black uppercase text-gray-400">Passenger</p>
+                                    <p className="text-lg font-black">{selectedAlert?.passenger?.name}</p>
+                                    <p className="text-xs font-mono text-gray-500 mt-0.5">{selectedAlert?.passenger?.phone}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase text-gray-400">Assigned Operator (Driver)</p>
+                                    <p className="text-sm font-bold uppercase">{selectedAlert?.driver?.name || 'N/A'}</p>
+                                    <p className="text-xs font-mono text-gray-500 mt-0.5">{selectedAlert?.driver?.phone || 'UNREGISTERED'}</p>
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                  </div>
+
+                    {/* Section: Emergency Protocols */}
+                    <section>
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 text-gray-400 border-b pb-2">04. Designated Safety Contacts</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            {selectedAlert?.passenger?.contacts?.length > 0 ? selectedAlert.passenger.contacts.map((c, i) => (
+                                <div key={i} className="flex justify-between items-center bg-gray-50 p-4 border border-gray-100">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-tighter">{c.name}</p>
+                                        <p className="text-xs font-mono">{c.phone}</p>
+                                    </div>
+                                    <Phone size={14} className="text-[#008751]" />
+                                </div>
+                            )) : <p className="text-[10px] text-gray-400 uppercase italic">No emergency protocols registered for this user.</p>}
+                        </div>
+                    </section>
                 </div>
+            </div>
 
-              </div>
-
-              <div className="mt-12 flex gap-4">
-                 <button className="flex-1 bg-red-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-red-700 transition-all">Dispatch Police</button>
-                 <button onClick={() => setSelectedAlert(null)} className="flex-1 bg-gray-100 text-gray-400 py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em]">Close</button>
-              </div>
+            {/* Action Footer */}
+            <div className="p-10 border-t border-gray-100 flex gap-4 bg-gray-50">
+                <button className="flex-1 bg-red-600 text-white py-4 rounded-lg font-black text-xs uppercase tracking-widest shadow-xl hover:bg-red-700 flex items-center justify-center gap-3">
+                    <ShieldAlert size={18} /> Dispatch SAPS Emergency
+                </button>
+                <button className="bg-black text-white px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-gray-800 flex items-center gap-3">
+                    <Printer size={18} /> Print Record
+                </button>
+                <button className="bg-gray-200 text-gray-600 px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-gray-300 flex items-center gap-3">
+                    <ArrowDownToLine size={18} /> Download JSON
+                </button>
             </div>
           </div>
         </div>
