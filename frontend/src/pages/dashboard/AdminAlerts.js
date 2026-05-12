@@ -199,7 +199,7 @@ const AdminAlerts = () => {
             </div>
 
             {/* Action Footer */}
-            <div className="p-10 border-t-4 border-black flex gap-4 bg-gray-100">
+            {/* <div className="p-10 border-t-4 border-black flex gap-4 bg-gray-100">
                 <button className="flex-1 bg-red-700 text-white py-5 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-red-800 flex items-center justify-center gap-3 transition-all active:scale-95">
                     <ShieldAlert size={20} /> Dispatch SAPS Emergency Units
                 </button>
@@ -209,7 +209,7 @@ const AdminAlerts = () => {
                 <button className="bg-gray-300 text-black px-10 py-5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-400 flex items-center gap-3 border border-gray-400">
                     <ArrowDownToLine size={20} /> Export
                 </button>
-            </div>
+            </div>*/}
           </div>
         </div>
       )}
