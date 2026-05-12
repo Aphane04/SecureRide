@@ -342,8 +342,28 @@ def admin_overview(user: models.User = Depends(get_current_user), db: Session = 
 @app.get("/admin/trips", response_model=List[schemas.AdminTripOut])
 def admin_trips(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
-    rows = db.query(models.Trip, models.User.email).join(models.User, models.Trip.passenger_id == models.User.id).all()
-    return [{"id": t.id, "passenger_email": e, "pickup_location": t.pickup_location, "destination": t.destination, "fare": t.fare, "status": t.status, "start_time": t.start_time} for t, e in rows]
+    
+    # 1. We use outerjoin so trips aren't hidden if a user is missing
+    # 2. We order by start_time DESC so the newest trips are at the top
+    rows = (
+        db.query(models.Trip, models.User.email)
+        .outerjoin(models.User, models.Trip.passenger_id == models.User.id)
+        .order_by(models.Trip.start_time.desc())
+        .all()
+    )
+    
+    return [
+        {
+            "id": trip.id,
+            "passenger_email": email if email else "Purged User",
+            "pickup_location": trip.pickup_location,
+            "destination": trip.destination,
+            "fare": trip.fare,
+            "status": trip.status,
+            "start_time": trip.start_time,
+        }
+        for trip, email in rows
+    ]
 
 # Add/Update this in main.py
 @app.delete("/auth/users/me")
