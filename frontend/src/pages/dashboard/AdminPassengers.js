@@ -36,9 +36,9 @@ const AdminPassengers = () => {
             <h2 className="text-3xl font-bold tracking-tight mb-1">Passengers</h2>
             <p className="text-gray-500 text-sm font-medium">{passengers.length} Total registered passengers</p>
           </div>
-          <button className="bg-[#b39ddb] hover:bg-[#9575cd] text-[#1a1a1a] px-6 py-2.5 rounded-full text-xs font-black flex items-center gap-2 transition-all shadow-lg">
-            <Plus size={16} /> {/*ADD NEW LOGIC TO THIS BUTTON IN FUTURE*/}
-          </button>
+          {/*<button className="bg-[#b39ddb] hover:bg-[#9575cd] text-[#1a1a1a] px-6 py-2.5 rounded-full text-xs font-black flex items-center gap-2 transition-all shadow-lg">
+            <Plus size={16} /> ADD NEW LOGIC TO THIS BUTTON IN FUTURE
+          </button>*/}
         </div>
 
         {/* 2. Filter Bar */}

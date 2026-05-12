@@ -83,10 +83,10 @@ const AdminDash = () => {
             <ChevronRight size={12} />
           </NavLink>
           <div className="px-10 py-8 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em] mb-2">System</div>
-          <NavLink to="settings" className={navLinkClass}>
+         {/* <NavLink to="settings" className={navLinkClass}>
             <div className="flex items-center gap-4"><Settings size={18}/> <span>Settings</span></div>
             <ChevronRight size={12} />
-          </NavLink>
+          </NavLink>*/}
         </nav>
         <div className="p-10 border-t border-white/5">
           <button onClick={handleLogout} className="flex items-center gap-3 text-red-500 font-black text-[10px] uppercase tracking-widest hover:text-red-400 transition group">
