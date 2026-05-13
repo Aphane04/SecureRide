@@ -342,28 +342,50 @@ def admin_overview(user: models.User = Depends(get_current_user), db: Session = 
 @app.get("/admin/trips", response_model=List[schemas.AdminTripOut])
 def admin_trips(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
+    # We use outerjoin and remove .limit() to show EVERY trip
+    rows = db.query(models.Trip, models.User.email).outerjoin(
+        models.User, models.Trip.passenger_id == models.User.id
+    ).order_by(models.Trip.start_time.desc()).all()
     
-    # 1. We use outerjoin so trips aren't hidden if a user is missing
-    # 2. We order by start_time DESC so the newest trips are at the top
-    rows = (
-        db.query(models.Trip, models.User.email)
-        .outerjoin(models.User, models.Trip.passenger_id == models.User.id)
-        .order_by(models.Trip.start_time.desc())
-        .all()
-    )
-    
-    return [
-        {
-            "id": trip.id,
-            "passenger_email": email if email else "Purged User",
-            "pickup_location": trip.pickup_location,
-            "destination": trip.destination,
-            "fare": trip.fare,
-            "status": trip.status,
-            "start_time": trip.start_time,
-        }
-        for trip, email in rows
-    ]
+    return [{
+        "id": t.id,
+        "passenger_email": e if e else "Purged User",
+        "pickup_location": t.pickup_location,
+        "destination": t.destination,
+        "fare": t.fare,
+        "status": t.status,
+        "start_time": t.start_time
+    } for t, e in rows]
+
+# --- 2. Fix Admin Alerts (Ensure valid data mapping) ---
+@app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
+def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    logs = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all()
+    result = []
+    for log in logs:
+        trip = db.query(models.Trip).filter(models.Trip.id == log.trip_id).first()
+        if not trip: continue
+        
+        p_user = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
+        d_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
+        contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == trip.passenger_id).all()
+
+        result.append({
+            "id": log.id, "transcript": log.transcript, "detected_at": log.detected_at,
+            "trip": {"id": trip.id, "pickup": trip.pickup_location, "destination": trip.destination, "status": trip.status},
+            "passenger": {
+                "name": p_user.profile.full_name if (p_user and p_user.profile) else "Unknown",
+                "phone": p_user.profile.phone if (p_user and p_user.profile) else "N/A",
+                "contacts": [{"name": c.name, "phone": c.phone} for c in contacts]
+            },
+            "driver": {
+                "name": d_user.profile.full_name if (d_user and d_user.profile) else "Not Assigned",
+                "phone": d_user.profile.phone if (d_user and d_user.profile) else "N/A"
+            }
+        })
+    return result
+
 
 # Add/Update this in main.py
 @app.delete("/auth/users/me")
@@ -537,11 +559,10 @@ def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session 
 @app.get("/admin/users", response_model=List[schemas.AdminUserOut])
 def get_all_system_users(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
-    # Fetch everyone: Admins, Drivers, and Passengers
     users = db.query(models.User).all()
     return [{
         "id": u.id, "email": u.email, "role": u.role, "is_verified": u.is_verified,
-        "full_name": u.profile.full_name if u.profile else "Unknown",
+        "full_name": u.profile.full_name if u.profile else "No Profile",
         "gender": u.profile.gender if u.profile else "N/A",
         "created_at": u.created_at
     } for u in users]

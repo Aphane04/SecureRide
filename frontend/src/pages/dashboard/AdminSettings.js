@@ -112,30 +112,35 @@ const AdminSettings = () => {
             </tr>
           </thead>
           <tbody className="text-black font-bold">
-            {filteredUsers.map((u) => (
-              <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                {isDeleteMode && (
-                  <td className="p-6">
-                    <input type="checkbox" checked={selectedIds.includes(u.id)} onChange={() => toggleSelect(u.id)} className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-600 cursor-pointer" />
-                  </td>
-                )}
-                <td className="p-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-[10px] uppercase">{u.full_name.charAt(0)}</div>
-                    <div>
-                      <p className="text-sm">{u.full_name}</p>
-                      <p className="text-[10px] text-gray-400 font-medium tracking-tighter">{u.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-6 text-xs text-gray-500 uppercase tracking-tighter">{u.role}</td>
-                <td className="p-6 text-xs text-center text-gray-400 uppercase">{u.gender}</td>
-                <td className="p-6 text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
-                <td className="p-6 text-center">
-                  {u.is_verified ? <CheckCircle size={16} className="text-green-500 mx-auto" /> : <XCircle size={16} className="text-gray-200 mx-auto" />}
-                </td>
-              </tr>
-            ))}
+           {filteredUsers.map((u) => (
+  <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors text-black">
+    {isDeleteMode && (
+      <td className="p-6">
+        <input 
+          type="checkbox" 
+          checked={selectedIds.includes(u.id)} 
+          onChange={() => toggleSelect(u.id)} 
+        />
+      </td>
+    )}
+    <td className="p-6">
+      <div className="flex items-center gap-3">
+        {/* FIX: Add safety checks here */}
+        <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-[10px] uppercase font-bold">
+           {u.full_name ? u.full_name.charAt(0) : '?'}
+        </div>
+        <div>
+          <p className="text-sm font-black">{u.full_name || 'Incomplete Profile'}</p>
+          <p className="text-[10px] text-gray-400 font-bold uppercase">{u.email}</p>
+        </div>
+      </div>
+    </td>
+    <td className="p-6 text-xs font-bold uppercase text-gray-500">{u.role}</td>
+    <td className="p-6 text-xs text-center text-gray-400">{u.gender || 'N/A'}</td>
+    <td className="p-6 text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
+    {/* ... rest of your code ... */}
+  </tr>
+))}
           </tbody>
         </table>
       </div>
