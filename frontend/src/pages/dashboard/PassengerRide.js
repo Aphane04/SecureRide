@@ -47,26 +47,23 @@ const PassengerRide = () => {
 
   const originRef = useRef();
   const destinationRef = useRef();
+  const alertedTripId = useRef(null); // FIX: Prevents repeated alerts
 
   const { dangerDetected } = useAiMonitor(activeTripId);
 
-  // 1. Session Recovery: Check for trip on page load
   useEffect(() => {
     const recoverSession = async () => {
       try {
         const res = await tripAPI.getActiveTrip();
-        if (res.data) {
+        if (res.data && res.data.status !== 'Canceled') {
           setActiveTripId(res.data.id);
-          if (res.data.status === 'Active') {
-            setActiveTripDetails(res.data);
-          }
+          if (res.data.status === 'Active') setActiveTripDetails(res.data);
         }
       } catch (err) {}
     };
     recoverSession();
   }, []);
 
-  // 2. Geolocation: Use current location
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) return alert("Geolocation not supported");
     setIsLocating(true);
@@ -81,16 +78,6 @@ const PassengerRide = () => {
     );
   };
 
-  // 3. Trip Cancellation
-  const handleCancelTrip = async () => {
-    if (!activeTripId) return;
-    if (!window.confirm("Abort this ride request?")) return;
-    try {
-      await tripAPI.cancelTrip(activeTripId);
-      resetUI();
-    } catch (err) { alert("Cancellation failed."); }
-  };
-
   const resetUI = () => {
     setActiveTripId(null);
     setActiveTripDetails(null);
@@ -101,6 +88,16 @@ const PassengerRide = () => {
     setDuration('');
     if (originRef.current) originRef.current.value = '';
     if (destinationRef.current) destinationRef.current.value = '';
+  };
+
+  const handleCancelTrip = async () => {
+    if (!activeTripId) return;
+    if (!window.confirm("Abort this ride request?")) return;
+    try {
+      await tripAPI.cancelTrip(activeTripId);
+      alertedTripId.current = activeTripId; // Mark as handled
+      resetUI();
+    } catch (err) { alert("Cancellation failed."); }
   };
 
   async function calculateRoute() {
@@ -137,11 +134,11 @@ const PassengerRide = () => {
           fare: fare,
         });
         setActiveTripId(response.data.id);
+        alertedTripId.current = null; // Reset alert memory for new trip
         setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
     } catch (err) { console.error(err); }
   };
 
-  // 4. Polling: Sync status between Driver and Passenger
   useEffect(() => {
     if (!activeTripId) return;
 
@@ -149,13 +146,15 @@ const PassengerRide = () => {
       try {
         const res = await tripAPI.getActiveTrip();
         if (res.data) {
-          // Detect Driver Cancellation
+          // One-time alert for cancellation
           if (res.data.status === 'Canceled') {
-            alert("The driver has canceled. Looking for a new match...");
-            resetUI();
+            if (alertedTripId.current !== res.data.id) {
+              alertedTripId.current = res.data.id;
+              alert("The driver has canceled. Searching for a new match...");
+              resetUI();
+            }
             return;
           }
-          // Detect Driver Acceptance
           if (res.data.status === 'Active') {
             setActiveTripDetails(res.data);
             setBookingMessage('DRIVER MATCHED!');
@@ -171,7 +170,6 @@ const PassengerRide = () => {
     return () => clearInterval(timer);
   }, [activeTripId]);
 
-  // 5. Draw route on map when trip starts
   useEffect(() => {
     if (!activeTripDetails || !window.google) return;
     const service = new window.google.maps.DirectionsService();
@@ -185,14 +183,10 @@ const PassengerRide = () => {
   }, [activeTripDetails]);
 
   if (loadError) return <div className="p-10 text-red-500 font-bold text-center">Map Failure</div>;
-  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs animate-pulse tracking-widest uppercase">Initializing Secure Terminal...</div>;
-
-  const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400";
-  const labelClass = "text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1";
+  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs animate-pulse tracking-widest uppercase">Initializing...</div>;
 
   return (
     <div className="h-full bg-white flex flex-col font-sans">
-      
       <div className="h-[52%] relative border-b border-gray-100">
         <GoogleMap center={center} zoom={15} mapContainerStyle={{ width: '100%', height: '100%' }} options={{ disableDefaultUI: true }}>
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
@@ -217,7 +211,6 @@ const PassengerRide = () => {
             <h2 className="text-2xl font-black text-black tracking-tight flex items-center gap-2 uppercase">
                 <Shield className="text-[#008751]" size={24} /> Secure Ride
             </h2>
-            
             <div className="flex items-center gap-3">
                 {activeTripId && (
                     <button onClick={handleCancelTrip} className="bg-red-50 text-red-600 border border-red-100 px-4 py-1.5 rounded-full flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all shadow-sm">
@@ -225,59 +218,50 @@ const PassengerRide = () => {
                         <span className="text-[9px] font-black uppercase tracking-widest">Cancel Ride</span>
                     </button>
                 )}
-                <div className="bg-gray-100 px-4 py-1.5 rounded-full border border-gray-200">
+                <div className="bg-gray-100 px-4 py-1.5 rounded-full border border-gray-200 shadow-sm">
                     <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Safety Tier: Gold</span>
                 </div>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="grid md:grid-cols-2 gap-6 mb-8 text-black">
             <div className="flex flex-col relative">
-              <label className={labelClass}>Starting Terminal</label>
+              <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Starting Terminal</label>
               <MapPin className="absolute left-3 top-9 text-gray-400" size={16} />
               <Autocomplete className="w-full">
-                <input ref={originRef} placeholder="Pickup Address" className={inputClass} />
+                <input ref={originRef} placeholder="Pickup Address" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
               </Autocomplete>
               <button onClick={handleUseCurrentLocation} disabled={isLocating} className="absolute right-3 top-8 p-1 hover:bg-gray-200 rounded-md text-[#008751]">
                 <LocateFixed size={18} className={isLocating ? 'animate-spin opacity-50' : ''} />
               </button>
             </div>
             <div className="flex flex-col relative">
-              <label className={labelClass}>Destination Point</label>
+              <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Destination Point</label>
               <Navigation className="absolute left-3 top-9 text-[#008751]" size={16} />
               <Autocomplete className="w-full">
-                <input ref={destinationRef} placeholder="Where to?" className={inputClass} />
+                <input ref={destinationRef} placeholder="Where to?" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
               </Autocomplete>
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm">
-              Calculate Fare
-            </button>
-            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">
-              Request Transport
-            </button>
+            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm">Calculate Fare</button>
+            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">Request Transport</button>
           </div>
 
-          {/* DYNAMIC SEARCHING / MATCHED STATUS */}
           {activeTripId && (
-            <div className="mb-8 p-8 border border-gray-100 rounded-[2.5rem] bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-700">
+            <div className="mb-8 p-8 border border-gray-100 rounded-[2.5rem] bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-700 text-black">
                {activeTripDetails ? (
                   <>
-                    <div className="bg-[#008751]/10 p-4 rounded-full mb-4">
-                        <CheckCircle2 size={40} className="text-[#008751]" />
-                    </div>
-                    <p className="text-sm font-black text-black uppercase tracking-tight">Driver Identified</p>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center">
-                        Secure pickup en route to target destination
-                    </p>
+                    <div className="bg-[#008751]/10 p-4 rounded-full mb-4"><CheckCircle2 size={40} className="text-[#008751]" /></div>
+                    <p className="text-sm font-black uppercase tracking-tight">Driver Identified</p>
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center">Secure pickup en route to target destination</p>
                   </>
                ) : (
                   <>
                     <Loader2 size={40} className="text-[#008751] animate-spin mb-4" />
-                    <p className="text-sm font-black text-black uppercase tracking-tight">Searching for Driver</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">AI Protocol: Scanning local network...</p>
+                    <p className="text-sm font-black uppercase tracking-tight">Searching for Driver</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 text-center">AI Protocol: Scanning local network...</p>
                   </>
                )}
             </div>
