@@ -27,8 +27,7 @@ export const authAPI = {
   getProfile: () => api.get('/auth/users/me'),
   updateProfile: (data) => api.put('/auth/users/me', data),
      deleteAccount: () => api.delete('/auth/users/me'),
-     getAllUsers: () => api.get('/admin/users'),
-  bulkDelete: (ids) => api.post('/admin/users/bulk-delete', ids),
+    
 };
 
 export const tripAPI = {
@@ -63,6 +62,8 @@ export const adminAPI = {
   passengers: () => api.get('/admin/passengers'),
   alerts: () => api.get('/admin/alerts'),
   getNotifications: () => api.get('/admin/notifications'),
+   getAllUsers: () => api.get('/admin/users'),
+  bulkDelete: (ids) => api.post('/admin/users/bulk-delete', ids),
 };
 
 export default api;
