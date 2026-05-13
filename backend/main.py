@@ -376,20 +376,24 @@ def admin_notifs(user: models.User = Depends(get_current_user), db: Session = De
     return [{"id": u.id, "message": f"New {u.role} registered: {u.email}", "time": u.created_at.isoformat() + "Z"} for u in users]
 
 @app.get("/admin/users", response_model=List[schemas.AdminUserOut])
-def get_all_users(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_all_users_for_settings(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     users = db.query(models.User).all()
-    return [{
-        "id": u.id, "email": u.email, "role": u.role, "is_verified": u.is_verified,
-        "full_name": u.profile.full_name if u.profile else "N/A",
-        "gender": u.profile.gender if u.profile else "N/A",
-        "created_at": u.created_at
-    } for u in users]
+    res = []
+    for u in users:
+        res.append({
+            "id": u.id, "email": u.email, "role": u.role, "is_verified": u.is_verified,
+            "full_name": u.profile.full_name if u.profile else "Incomplete",
+            "gender": u.profile.gender if u.profile else "N/A",
+            "created_at": u.created_at
+        })
+    return res
 
 @app.post("/admin/users/bulk-delete")
-def bulk_delete(data: List[int], user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def bulk_delete_users(data: List[int], user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
-    ids = [i for i in data if i != user.id]
-    db.query(models.User).filter(models.User.id.in_(ids)).delete(synchronize_session=False)
+    # Prevent admin from deleting themselves
+    ids_to_purge = [i for i in data if i != user.id]
+    db.query(models.User).filter(models.User.id.in_(ids_to_purge)).delete(synchronize_session=False)
     db.commit()
-    return {"status": "ok"}
+    return {"status": "success"}
