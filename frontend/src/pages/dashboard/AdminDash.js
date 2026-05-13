@@ -99,10 +99,10 @@ const AdminDash = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         
         <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-12 z-10">
-          <div className="flex items-center gap-4 bg-gray-50 px-5 py-2.5 rounded-2xl border border-gray-100">
+         {/* <div className="flex items-center gap-4 bg-gray-50 px-5 py-2.5 rounded-2xl border border-gray-100">
             <Search size={16} className="text-gray-400" />
             <input type="text" placeholder="Search global records..." className="bg-transparent border-none outline-none text-xs text-gray-600 w-64 font-medium" />
-          </div>
+          </div>*/}
 
           <div className="flex items-center gap-8 relative" ref={dropdownRef}>
             {/* FUNCTIONAL BELL ICON */}
