@@ -27,6 +27,7 @@ import AdminOverview from './pages/dashboard/AdminOverview';
 import AdminDrivers from './pages/dashboard/AdminDrivers';
 import AdminPassengers from './pages/dashboard/AdminPassengers';
 import AdminAlerts from './pages/dashboard/AdminAlerts';
+import AdminSettings from './pages/dashboard/AdminSettings';
 
 function App() {
   return (
