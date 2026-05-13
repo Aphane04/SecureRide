@@ -490,25 +490,23 @@ def get_driver_history(user: models.User = Depends(get_current_user), db: Sessio
         models.Trip.driver_id == user.id
     ).order_by(models.Trip.start_time.desc()).all()
 
-@app.get("/admin/alerts")
+@app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
 def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     
-    # Query logs and join with all related safety data
     logs = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all()
     
     result = []
     for log in logs:
-        # Get Trip Details
         trip = db.query(models.Trip).filter(models.Trip.id == log.trip_id).first()
         if not trip: continue
         
-        # Get Passenger Info
+        # Fetch Passenger
         p_user = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
         p_profile = p_user.profile if p_user else None
         p_contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == trip.passenger_id).all()
         
-        # Get Driver Info
+        # Fetch Driver
         d_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
         d_profile = d_user.profile if d_user else None
         
@@ -529,7 +527,7 @@ def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session 
                 "contacts": [{"name": c.name, "phone": c.phone} for c in p_contacts]
             },
             "driver": {
-                "name": d_profile.full_name if d_profile else "Unknown",
+                "name": d_profile.full_name if d_profile else "Not Assigned",
                 "phone": d_profile.phone if d_profile else "N/A"
             }
         })

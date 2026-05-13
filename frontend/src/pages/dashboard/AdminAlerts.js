@@ -60,24 +60,29 @@ const AdminAlerts = () => {
               {alerts.map((a) => {
                 const severity = getSeverity(a.transcript);
                 return (
-                  <tr key={a.id} className="hover:bg-gray-50 border-b border-gray-200 transition-colors">
-                    <td className="p-6">
-                        <span className={`${severity.color} text-[11px] font-black tracking-widest flex items-center gap-2`}>
-                            <div className={`w-2.5 h-2.5 rounded-full ${severity.dot}`} />
-                            {severity.label}
-                        </span>
-                    </td>
-                    <td className="p-6 font-mono text-xs text-gray-900">#SR-2026-{a.trip?.id}</td>
-                    <td className="p-6 italic text-sm text-gray-900">"{a.transcript}"</td>
-                    <td className="p-6 text-center">
-                        <button 
-                            onClick={() => setSelectedAlert(a)}
-                            className="bg-black text-white px-6 py-2 rounded-lg text-[10px] font-bold tracking-widest hover:bg-red-700 transition-all uppercase"
-                        >
-                            Open Dossier
-                        </button>
-                    </td>
-                  </tr>
+                <tr key={a.id} className="hover:bg-gray-50 border-b border-gray-200 transition-colors">
+  <td className="p-6">
+      <span className={`${severity.color} text-[11px] font-black tracking-widest flex items-center gap-2`}>
+          <div className={`w-2.5 h-2.5 rounded-full ${severity.dot}`} />
+          {severity.label}
+      </span>
+  </td>
+  {/* FIX: Accessing trip.id inside the nested trip object */}
+  <td className="p-6 font-mono text-xs text-gray-900 uppercase">
+    #SR-2026-{a.trip?.id || '000'}
+  </td>
+  <td className="p-6 italic text-sm text-gray-900 font-bold">
+    "{a.transcript}"
+  </td>
+  <td className="p-6 text-center">
+      <button 
+          onClick={() => setSelectedAlert(a)}
+          className="bg-black text-white px-6 py-2 rounded-lg text-[10px] font-bold tracking-widest hover:bg-red-700 transition-all uppercase"
+      >
+          Open Dossier
+      </button>
+  </td>
+</tr>
                 );
               })}
             </tbody>

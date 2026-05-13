@@ -2,12 +2,14 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
-# 1. Authentication Schemas
+# ==========================================
+# 1. CORE AUTH & USER SCHEMAS
+# ==========================================
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-# 2. User & Profile Base Schemas
 class UserCreate(BaseModel):
     email: EmailStr
     full_name: str
@@ -45,7 +47,10 @@ class UserProfileOut(BaseModel):
     id_number: Optional[str]
     is_verified: bool
 
-# 3. Vehicle Schema (Defined here so Admin schemas can use it)
+# ==========================================
+# 2. DETAIL SCHEMAS (Defined before use)
+# ==========================================
+
 class VehicleOut(BaseModel):
     id: int
     make_model: str
@@ -54,7 +59,22 @@ class VehicleOut(BaseModel):
     class Config:
         from_attributes = True
 
-# 4. Admin Intelligence Schemas
+class AlertTripDetail(BaseModel):
+    id: int
+    pickup: str
+    destination: str
+    status: str
+
+class AlertUserDetail(BaseModel):
+    name: str
+    phone: str
+    email: Optional[str] = None
+    contacts: List[dict] = []
+
+# ==========================================
+# 3. ADMIN INTELLIGENCE SCHEMAS
+# ==========================================
+
 class AdminUserOut(BaseModel):
     id: int
     email: str
@@ -89,11 +109,19 @@ class AdminTripOut(BaseModel):
 
 class AdminAlertOut(BaseModel):
     id: int
-    trip_id: int
     transcript: str
     detected_at: datetime
+    trip: AlertTripDetail
+    passenger: AlertUserDetail
+    driver: AlertUserDetail
 
-# 5. Emergency Contacts (Both Input and Output)
+    class Config:
+        from_attributes = True
+
+# ==========================================
+# 4. EMERGENCY & CONTACT SCHEMAS
+# ==========================================
+
 class EmergencyContactCreate(BaseModel):
     name: str
     phone: str
@@ -107,7 +135,13 @@ class EmergencyContactOut(BaseModel):
     class Config:
         from_attributes = True
 
-# 6. Trip Logistics Schemas
+class EmergencyAlert(BaseModel):
+    transcript: str
+
+# ==========================================
+# 5. TRIP LOGISTICS SCHEMAS
+# ==========================================
+
 class TripEstimateRequest(BaseModel):
     pickup_location: str
     destination: str
@@ -134,7 +168,6 @@ class TripOut(BaseModel):
     distance_km: float
     duration_minutes: float
     fare: float
-    # Change these to Optional to prevent crashes if they are empty in the DB
     passenger_id: Optional[int] = None
     driver_id: Optional[int] = None
     payment_method: Optional[str] = "Cash"
@@ -142,9 +175,9 @@ class TripOut(BaseModel):
     class Config:
         from_attributes = True
 
-# 7. Safety & Update Schemas
-class EmergencyAlert(BaseModel):
-    transcript: str
+# ==========================================
+# 6. PROFILE UPDATE SCHEMAS
+# ==========================================
 
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
