@@ -534,3 +534,26 @@ def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session 
             }
         })
     return result
+
+# Add to main.py
+@app.get("/admin/users", response_model=List[schemas.AdminUserOut])
+def get_all_system_users(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    # Fetch everyone: Admins, Drivers, and Passengers
+    users = db.query(models.User).all()
+    return [{
+        "id": u.id, "email": u.email, "role": u.role, "is_verified": u.is_verified,
+        "full_name": u.profile.full_name if u.profile else "Unknown",
+        "gender": u.profile.gender if u.profile else "N/A",
+        "created_at": u.created_at
+    } for u in users]
+
+@app.post("/admin/users/bulk-delete")
+def bulk_delete_users(data: List[int], user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    # Filter out current admin so they don't delete themselves
+    ids_to_delete = [uid for uid in data if uid != user.id]
+    
+    db.query(models.User).filter(models.User.id.in_(ids_to_delete)).delete(synchronize_session=False)
+    db.commit()
+    return {"message": f"Successfully purged {len(ids_to_delete)} records."}
