@@ -343,13 +343,12 @@ def admin_overview(user: models.User = Depends(get_current_user), db: Session = 
 def admin_trips(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     
-    # 1. We use outerjoin so trips aren't hidden if a user is missing
-    # 2. We order by start_time DESC so the newest trips are at the top
+    # REMOVE .limit() to show all records
     rows = (
         db.query(models.Trip, models.User.email)
         .outerjoin(models.User, models.Trip.passenger_id == models.User.id)
         .order_by(models.Trip.start_time.desc())
-        .all()
+        .all() # Fetches every single trip in the database
     )
     
     return [

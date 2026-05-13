@@ -3,7 +3,7 @@ import { adminAPI } from '../../utils/api';
 import { 
   Users, Car, ShieldAlert, Navigation, 
   Clock, MapPin, Activity, ChevronRight, 
-  MoreHorizontal, Banknote 
+  MoreHorizontal, Banknote, RefreshCcw
 } from 'lucide-react';
 
 const AdminOverview = () => {
@@ -11,22 +11,30 @@ const AdminOverview = () => {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const loadData = async () => {
+    try {
+        setIsSyncing(true);
+        const [ovRes, tripRes] = await Promise.all([
+            adminAPI.overview(),
+            adminAPI.trips()
+        ]);
+        setOverview(ovRes.data);
+        setTrips(tripRes.data);
+    } catch (err) {
+        console.error("Dashboard sync error");
+    } finally {
+        setLoading(false);
+        setIsSyncing(false);
+    }
+  };
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
   useEffect(() => {
-    const loadData = async () => {
-        try {
-            const [ovRes, tripRes] = await Promise.all([
-                adminAPI.overview(),
-                adminAPI.trips()
-            ]);
-            setOverview(ovRes.data);
-            setTrips(tripRes.data);
-        } catch (err) {
-            console.error("Dashboard sync error");
-        } finally {
-            setLoading(false);
-        }
-    };
     loadData();
+    // Auto-refresh stats every 30 seconds
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -40,9 +48,12 @@ const AdminOverview = () => {
                     <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Network Intelligence</h2>
                     <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">Real-time system diagnostics</p>
                 </div>
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-5 py-2 rounded-full backdrop-blur-md">
-                    <Activity size={14} className="text-green-500 animate-pulse" />
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-white">System: Optimized</span>
+                <div className="flex items-center gap-4">
+                    {isSyncing && <RefreshCcw size={16} className="text-green-500 animate-spin" />}
+                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-5 py-2 rounded-full backdrop-blur-md">
+                        <Activity size={14} className="text-green-500 animate-pulse" />
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-white">System: Optimized</span>
+                    </div>
                 </div>
             </div>
 
@@ -54,78 +65,88 @@ const AdminOverview = () => {
         </div>
       </div>
 
-      {/* 2. Recent Trips Table (White Card) */}
-      <div className="max-w-[1600px] mx-auto px-8 -mt-10">
-        <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100">
-          <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-white">
-            <h3 className="font-black text-xl tracking-tight uppercase">Recent Operational Activity</h3>
-            <span className="text-[10px] font-black bg-gray-100 px-4 py-1.5 rounded-full text-gray-500 uppercase tracking-widest">
-                {trips.length} Records Found
+      {/* 2. Full Trips Table (White Card) */}
+      <div className="max-w-[1600px] mx-auto px-8 -mt-10 mb-20">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 flex flex-col h-[600px]">
+          <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-white shrink-0">
+            <h3 className="font-black text-xl tracking-tight uppercase">Full Operational History</h3>
+            <span className="text-[10px] font-black bg-black text-white px-4 py-1.5 rounded-full uppercase tracking-[0.2em]">
+                {trips.length} Total Logs
             </span>
           </div>
 
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Authorized User</th>
-                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Mission Route</th>
-                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction</th>
-                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="text-black">
-              {loading ? (
-                  <tr><td colSpan="5" className="p-20 text-center text-gray-400 uppercase font-black animate-pulse">Syncing Network...</td></tr>
-              ) : trips.length > 0 ? trips.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 transition-colors border-b border-gray-50">
-                  <td className="p-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-black shadow-lg">
-                            {t.passenger_email.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-black text-sm">{t.passenger_email}</span>
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5 truncate max-w-xs">
-                            <MapPin size={12} className="text-gray-300"/> {t.pickup_location}
-                        </span>
-                        <span className="text-xs font-black text-black flex items-center gap-1.5 truncate max-w-xs uppercase">
-                            <Navigation size={12} className="text-green-600"/> {t.destination}
-                        </span>
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <div className="flex items-center gap-2">
-                        <Banknote size={16} className="text-green-600" />
-                        <span className="text-sm font-black">R {t.fare}</span>
-                    </div>
-                  </td>
-                  <td className="p-6 text-center">
-                    <StatusBadge status={t.status} />
-                  </td>
-                  <td className="p-6 text-center">
-                    <button className="p-2.5 bg-gray-100 rounded-xl hover:bg-black hover:text-white transition-all">
-                        <MoreHorizontal size={18}/>
-                    </button>
-                  </td>
+          {/* Scrollable Body - This allows you to see "All" records without breaking the page */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm border-b border-gray-100">
+                <tr>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Authorized User</th>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Mission Route</th>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction</th>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Action</th>
                 </tr>
-              )) : (
-                <tr><td colSpan="5" className="p-20 text-center text-gray-300 uppercase font-black text-xs">No active trips in database</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="text-black">
+                {loading ? (
+                    <tr><td colSpan="5" className="p-20 text-center text-gray-400 uppercase font-black animate-pulse">Syncing Network...</td></tr>
+                ) : trips.length > 0 ? trips.map((t) => (
+                  <tr key={t.id} className="hover:bg-gray-50 transition-colors border-b border-gray-50">
+                    <td className="p-6">
+                      <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-black shadow-lg">
+                              {t.passenger_email.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-black text-sm">{t.passenger_email}</span>
+                      </div>
+                    </td>
+                    <td className="p-6 text-xs font-bold text-gray-600">
+                        <div className="flex items-center gap-2 mb-1">
+                            <MapPin size={12} className="text-gray-300"/> 
+                            <span className="truncate max-w-[250px]">{t.pickup_location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Navigation size={12} className="text-green-600"/> 
+                            <span className="truncate max-w-[250px] text-black uppercase font-black">{t.destination}</span>
+                        </div>
+                    </td>
+                    <td className="p-6">
+                      <div className="flex items-center gap-2">
+                          <Banknote size={16} className="text-green-600" />
+                          <span className="text-sm font-black">R {t.fare}</span>
+                      </div>
+                    </td>
+                    <td className="p-6 text-center">
+                      <StatusBadge status={t.status} />
+                    </td>
+                    <td className="p-6 text-center">
+                      <button className="p-2.5 bg-gray-100 rounded-xl hover:bg-black hover:text-white transition-all">
+                          <MoreHorizontal size={18}/>
+                      </button>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="5" className="p-24 text-center text-gray-300 uppercase font-black text-xs">No active trips in database</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #008751; }
+      `}</style>
     </div>
   );
 };
 
 // Sub-component: Stats Card
 const StatCard = ({ label, value, icon, color, isAlert }) => (
-  <div className={`bg-[#1a1a1a] p-8 rounded-[2rem] border-b-4 ${color} relative overflow-hidden group hover:bg-[#222] transition-all`}>
+  <div className={`bg-[#1a1a1a] p-8 rounded-[2rem] border-b-4 ${color} relative overflow-hidden group hover:bg-[#1f1f1f] transition-all`}>
     <div className={`absolute top-6 right-6 text-gray-700 group-hover:text-white transition-colors ${isAlert ? 'text-red-500 animate-pulse' : ''}`}>
         {icon}
     </div>
