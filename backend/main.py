@@ -392,8 +392,42 @@ def get_all_users_for_settings(user: models.User = Depends(get_current_user), db
 @app.post("/admin/users/bulk-delete")
 def bulk_delete_users(data: List[int], user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
-    # Prevent admin from deleting themselves
-    ids_to_purge = [i for i in data if i != user.id]
-    db.query(models.User).filter(models.User.id.in_(ids_to_purge)).delete(synchronize_session=False)
-    db.commit()
-    return {"status": "success"}
+    
+    # Filter out current admin so you don't delete yourself
+    ids = [uid for uid in data if uid != user.id]
+    if not ids:
+        return {"message": "No valid IDs provided"}
+
+    try:
+        # 1. Delete Safety Logs linked to trips involving these users
+        db.query(models.AiSafetyLog).filter(models.AiSafetyLog.trip_id.in_(
+            db.query(models.Trip.id).filter(or_(models.Trip.passenger_id.in_(ids), models.Trip.driver_id.in_(ids)))
+        )).delete(synchronize_session=False)
+
+        # 2. Delete Trips
+        db.query(models.Trip).filter(or_(models.Trip.passenger_id.in_(ids), models.Trip.driver_id.in_(ids))).delete(synchronize_session=False)
+
+        # 3. Delete Vehicles
+        db.query(models.Vehicle).filter(models.Vehicle.driver_id.in_(ids)).delete(synchronize_session=False)
+
+        # 4. Delete Emergency Contacts
+        db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id.in_(ids)).delete(synchronize_session=False)
+
+        # 5. Delete Profiles
+        db.query(models.Profile).filter(models.Profile.user_id.in_(ids)).delete(synchronize_session=False)
+
+        # 6. Delete Role specific records
+        db.query(models.Passenger).filter(models.Passenger.user_id.in_(ids)).delete(synchronize_session=False)
+        db.query(models.Driver).filter(models.Driver.user_id.in_(ids)).delete(synchronize_session=False)
+        db.query(models.Admin).filter(models.Admin.user_id.in_(ids)).delete(synchronize_session=False)
+
+        # 7. Finally, delete the Users
+        db.query(models.User).filter(models.User.id.in_(ids)).delete(synchronize_session=False)
+
+        db.commit()
+        return {"message": f"Successfully purged {len(ids)} records."}
+
+    except Exception as e:
+        db.rollback()
+        print(f"❌ BULK DELETE FAILED: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database constraint error. Some users have active dependencies.")

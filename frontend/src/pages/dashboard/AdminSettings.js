@@ -53,16 +53,31 @@ const AdminSettings = () => {
     }
   };
 
-  const handleBulkDelete = async () => {
+ const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (window.confirm(`SECURITY ALERT: Permanently purge ${selectedIds.length} users from the database?`)) {
+    
+    if (window.confirm(`SECURITY ALERT: Permanently purge ${selectedIds.length} users and all associated trip/biometric data?`)) {
       try {
+        setLoading(true); // Show loading while deleting
         await adminAPI.bulkDelete(selectedIds);
-        alert("Database purged successfully.");
+        
+        // Success feedback
+        alert("Database purged. Synchronizing system...");
+        
+        // FORCE UI RESET
         setSelectedIds([]);
         setIsDeleteMode(false);
-        loadData();
-      } catch (err) { alert("Error during deletion."); }
+        
+        // Re-fetch fresh data from server
+        await loadData(); 
+        
+      } catch (err) {
+        const errorMsg = err.response?.data?.detail || "Delete failed due to database constraint.";
+        alert(`CRITICAL ERROR: ${errorMsg}`);
+        loadData(); // Refresh anyway to sync state
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
