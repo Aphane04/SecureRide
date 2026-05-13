@@ -1,59 +1,152 @@
 import React, { useEffect, useState } from 'react';
 import { adminAPI } from '../../utils/api';
+import { 
+  Users, Car, ShieldAlert, Navigation, 
+  Clock, MapPin, Activity, ChevronRight, 
+  MoreHorizontal, Banknote 
+} from 'lucide-react';
 
 const AdminOverview = () => {
   const [overview, setOverview] = useState({ drivers: 0, passengers: 0, active_trips: 0, safety_alerts: 0 });
   const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminAPI.overview().then((res) => setOverview(res.data));
-    adminAPI.trips().then((res) => setTrips(res.data));
+    const loadData = async () => {
+        try {
+            const [ovRes, tripRes] = await Promise.all([
+                adminAPI.overview(),
+                adminAPI.trips()
+            ]);
+            setOverview(ovRes.data);
+            setTrips(tripRes.data);
+        } catch (err) {
+            console.error("Dashboard sync error");
+        } finally {
+            setLoading(false);
+        }
+    };
+    loadData();
   }, []);
 
   return (
-    <div>
-      <div className="grid grid-cols-3 gap-6 mb-10">
-        <div className="bg-[#121212] p-6 rounded-lg border-b-2 border-green-500">
-          <p className="text-gray-400 text-sm">Active Drivers</p>
-          <p className="text-3xl font-bold">{overview.drivers}</p>
-        </div>
-        <div className="bg-[#121212] p-6 rounded-lg border-b-2 border-green-500">
-          <p className="text-gray-400 text-sm">Active Passengers</p>
-          <p className="text-3xl font-bold">{overview.passengers}</p>
-        </div>
-        <div className="bg-[#121212] p-6 rounded-lg border-b-2 border-red-500">
-          <p className="text-gray-400 text-sm">Safety Alerts (Live)</p>
-          <p className="text-3xl font-bold text-red-500">{overview.safety_alerts}</p>
+    <div className="min-h-screen bg-[#f8f9fa] font-sans text-black">
+      
+      {/* 1. Header & Stats Section (Dark) */}
+      <div className="bg-[#0a0a0a] p-10 pb-20 rounded-b-[3rem] shadow-2xl">
+        <div className="max-w-[1600px] mx-auto">
+            <div className="flex justify-between items-center mb-10">
+                <div>
+                    <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Network Intelligence</h2>
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">Real-time system diagnostics</p>
+                </div>
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-5 py-2 rounded-full backdrop-blur-md">
+                    <Activity size={14} className="text-green-500 animate-pulse" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-white">System: Optimized</span>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <StatCard label="Active Drivers" value={overview.drivers} icon={<Car size={24}/>} color="border-green-500" />
+                <StatCard label="Registered Passengers" value={overview.passengers} icon={<Users size={24}/>} color="border-blue-500" />
+                <StatCard label="Safety Alerts (Live)" value={overview.safety_alerts} icon={<ShieldAlert size={24}/>} color="border-red-500" isAlert={overview.safety_alerts > 0} />
+            </div>
         </div>
       </div>
 
-      <h3 className="text-xl font-bold mb-6">Recent Trips</h3>
-      <div className="bg-[#121212] rounded-xl overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-black text-gray-400 text-sm">
-            <tr>
-              <th className="p-4">Passenger</th>
-              <th className="p-4">Pickup</th>
-              <th className="p-4">Destination</th>
-              <th className="p-4">Fare</th>
-              <th className="p-4">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {trips.map((t) => (
-              <tr key={t.id}>
-                <td className="p-4">{t.passenger_email}</td>
-                <td className="p-4">{t.pickup_location}</td>
-                <td className="p-4">{t.destination}</td>
-                <td className="p-4 text-green-500">R {t.fare}</td>
-                <td className="p-4">{t.status}</td>
+      {/* 2. Recent Trips Table (White Card) */}
+      <div className="max-w-[1600px] mx-auto px-8 -mt-10">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100">
+          <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-white">
+            <h3 className="font-black text-xl tracking-tight uppercase">Recent Operational Activity</h3>
+            <span className="text-[10px] font-black bg-gray-100 px-4 py-1.5 rounded-full text-gray-500 uppercase tracking-widest">
+                {trips.length} Records Found
+            </span>
+          </div>
+
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Authorized User</th>
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Mission Route</th>
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction</th>
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="text-black">
+              {loading ? (
+                  <tr><td colSpan="5" className="p-20 text-center text-gray-400 uppercase font-black animate-pulse">Syncing Network...</td></tr>
+              ) : trips.length > 0 ? trips.map((t) => (
+                <tr key={t.id} className="hover:bg-gray-50 transition-colors border-b border-gray-50">
+                  <td className="p-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-black shadow-lg">
+                            {t.passenger_email.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-black text-sm">{t.passenger_email}</span>
+                    </div>
+                  </td>
+                  <td className="p-6">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5 truncate max-w-xs">
+                            <MapPin size={12} className="text-gray-300"/> {t.pickup_location}
+                        </span>
+                        <span className="text-xs font-black text-black flex items-center gap-1.5 truncate max-w-xs uppercase">
+                            <Navigation size={12} className="text-green-600"/> {t.destination}
+                        </span>
+                    </div>
+                  </td>
+                  <td className="p-6">
+                    <div className="flex items-center gap-2">
+                        <Banknote size={16} className="text-green-600" />
+                        <span className="text-sm font-black">R {t.fare}</span>
+                    </div>
+                  </td>
+                  <td className="p-6 text-center">
+                    <StatusBadge status={t.status} />
+                  </td>
+                  <td className="p-6 text-center">
+                    <button className="p-2.5 bg-gray-100 rounded-xl hover:bg-black hover:text-white transition-all">
+                        <MoreHorizontal size={18}/>
+                    </button>
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan="5" className="p-20 text-center text-gray-300 uppercase font-black text-xs">No active trips in database</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
+};
+
+// Sub-component: Stats Card
+const StatCard = ({ label, value, icon, color, isAlert }) => (
+  <div className={`bg-[#1a1a1a] p-8 rounded-[2rem] border-b-4 ${color} relative overflow-hidden group hover:bg-[#222] transition-all`}>
+    <div className={`absolute top-6 right-6 text-gray-700 group-hover:text-white transition-colors ${isAlert ? 'text-red-500 animate-pulse' : ''}`}>
+        {icon}
+    </div>
+    <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{label}</p>
+    <h4 className={`text-5xl font-black text-white tracking-tighter ${isAlert && value > 0 ? 'text-red-500' : ''}`}>{value}</h4>
+  </div>
+);
+
+// Sub-component: Status Badges
+const StatusBadge = ({ status }) => {
+    let style = "bg-gray-100 text-gray-500 border-gray-200";
+    if (status === "Searching") style = "bg-orange-50 text-orange-600 border-orange-100";
+    if (status === "Active") style = "bg-blue-50 text-blue-600 border-blue-100";
+    if (status === "Completed") style = "bg-green-50 text-green-600 border-green-100";
+    if (status === "Canceled") style = "bg-red-50 text-red-600 border-red-100";
+    
+    return (
+        <span className={`${style} px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border`}>
+            {status}
+        </span>
+    );
 };
 
 export default AdminOverview;
