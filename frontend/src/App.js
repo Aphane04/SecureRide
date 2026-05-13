@@ -70,6 +70,7 @@ function App() {
   <Route path="drivers" element={<AdminDrivers />} />
   <Route path="passengers" element={<AdminPassengers />} />
   <Route path="alerts" element={<AdminAlerts />} />
+  <Route path="settings" element={<AdminSettings />} /> 
 </Route>
 
         <Route path="/" element={<Navigate to="/login" />} />
