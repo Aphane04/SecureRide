@@ -231,11 +231,16 @@ def accept_ride(trip_id: int, user: models.User = Depends(get_current_user), db:
 
 @app.get("/trips/active", response_model=schemas.TripOut)
 def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    filters = [models.Trip.status == "Active"]
-    if user.role == "Passenger": filters.append(models.Trip.passenger_id == user.id)
-    else: filters.append(models.Trip.driver_id == user.id)
-    trip = db.query(models.Trip).filter(*filters).first()
-    if not trip: raise HTTPException(404)
+    # Search for the latest trip that is either Searching, Active, or Canceled
+    # This allows the 'other side' to detect the cancellation
+    trip = db.query(models.Trip).filter(
+        or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id),
+        models.Trip.status.in_(["Active", "Searching", "Canceled"])
+    ).order_by(models.Trip.start_time.desc()).first()
+
+    if not trip:
+        raise HTTPException(status_code=404, detail="No current mission")
+    
     return trip
 
 @app.post("/trips/{trip_id}/cancel")

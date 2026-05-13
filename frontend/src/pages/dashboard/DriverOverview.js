@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, DirectionsRenderer } from '@react-google-maps/api';
-import { useAiMonitor } from '../../utils/aiMonitor';
 import { 
   Car, CheckCircle, Camera, List, Power, ArrowRight, 
   Settings, MapPin, Navigation, ShieldCheck, RefreshCw, XCircle 
@@ -28,12 +27,38 @@ const DriverOverview = () => {
   const [directions, setDirections] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Sync Active Trip on Mount
+  // ==========================================
+  // SYNC LOGIC: Detect Passenger Cancellations
+  // ==========================================
   useEffect(() => {
-    tripAPI.getActiveTrip().then((res) => setActiveTrip(res.data)).catch(() => {});
-  }, []);
+    const syncActiveTrip = async () => {
+      try {
+        const res = await tripAPI.getActiveTrip();
+        if (res.data) {
+          // If the status has changed to Canceled in the DB, reset driver UI
+          if (res.data.status === 'Canceled') {
+            alert("MISSION ABORTED: The passenger has canceled this request.");
+            setActiveTrip(null);
+            setDirections(null);
+            return;
+          }
+          setActiveTrip(res.data);
+        }
+      } catch (err) {
+        // If 404, no active mission exists for this driver
+        if (activeTrip) {
+            setActiveTrip(null);
+            setDirections(null);
+        }
+      }
+    };
 
-  // Sync Ride Requests (Polling)
+    syncActiveTrip(); // Initial check on load
+    const timer = setInterval(syncActiveTrip, 5000); // Check every 5 seconds
+    return () => clearInterval(timer);
+  }, [activeTrip]);
+
+  // Sync Ride Requests (Available missions)
   useEffect(() => {
     if (!isOnline) {
       setRideRequests([]);
@@ -57,9 +82,9 @@ const DriverOverview = () => {
     return () => clearInterval(timer);
   }, [isOnline]);
 
-  // Handle Route Drawing
+  // Map Route Drawing
   useEffect(() => {
-    if (!activeTrip || !window.google) {
+    if (!activeTrip || !window.google || activeTrip.status === 'Canceled') {
       setDirections(null);
       return;
     }
@@ -82,14 +107,13 @@ const DriverOverview = () => {
       setActiveTrip(res.data);
       setRideRequests((prev) => prev.filter((t) => t.id !== tripId));
     } catch (err) {
-      alert(err.response?.data?.detail || 'Mission already accepted by another unit.');
+      alert(err.response?.data?.detail || 'Mission already claimed.');
     }
   };
 
-  // NEW: Driver Cancel Logic
   const handleCancelTrip = async () => {
     if (!activeTrip) return;
-    if (!window.confirm("Abort current mission? This will notify the passenger immediately.")) return;
+    if (!window.confirm("Abort current mission? This will notify the passenger.")) return;
 
     try {
       await tripAPI.cancelTrip(activeTrip.id);
@@ -97,7 +121,7 @@ const DriverOverview = () => {
       setDirections(null);
       alert("Mission Canceled.");
     } catch (err) {
-      alert("Error: Failed to cancel trip.");
+      alert("System Error: Failed to process cancellation.");
     }
   };
 
@@ -116,7 +140,7 @@ const DriverOverview = () => {
     }
   };
 
-  if (loadError) return <div className="p-10 text-red-500 font-bold text-center">Map System Error</div>;
+  if (loadError) return <div className="p-10 text-red-500 font-bold">Map System Error</div>;
   if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing...</div>;
 
   return (
@@ -143,16 +167,16 @@ const DriverOverview = () => {
             <Power size={16} /> {isOnline ? 'NETWORK ONLINE' : 'GO ONLINE'}
             </button>
 
-            <div className="hidden md:flex items-center gap-3 bg-white/90 backdrop-blur-md px-6 py-3.5 rounded-2xl border border-gray-100 shadow-xl">
+            <div className="hidden md:flex items-center gap-3 bg-white/90 backdrop-blur-md px-6 py-3.5 rounded-2xl border border-gray-100 shadow-xl text-black">
                 <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-ping' : 'bg-gray-300'}`} />
-                <span className="text-[10px] font-black uppercase text-black tracking-widest">
-                    {isOnline ? 'Scanning for Requests' : 'Disconnected'}
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                    {isOnline ? 'Scanning Network' : 'Disconnected'}
                 </span>
             </div>
         </div>
 
         <div className="flex items-center gap-3">
-            <button onClick={() => setShowVehicleForm(true)} className="p-3.5 rounded-2xl bg-white border border-gray-100 text-black shadow-xl transition-all" title="Register Vehicle">
+            <button onClick={() => setShowVehicleForm(true)} className="p-3.5 rounded-2xl bg-white border border-gray-100 text-black shadow-xl hover:bg-gray-50 transition-colors">
                 <Car size={20} />
             </button>
             <div className="p-3.5 rounded-2xl bg-white border border-gray-100 text-[#008751] shadow-xl">
@@ -161,36 +185,31 @@ const DriverOverview = () => {
         </div>
       </div>
 
-      {/* ACTIVE MISSION INDICATOR WITH CANCEL BUTTON */}
-      {activeTrip && (
+      {activeTrip && activeTrip.status !== 'Canceled' && (
         <div className="absolute top-24 left-6 z-10 animate-in slide-in-from-left-4 duration-500">
-           <div className="bg-white border-l-4 border-[#008751] p-5 rounded-2xl shadow-2xl flex items-center justify-between gap-6 min-w-[320px]">
+           <div className="bg-white border-l-4 border-[#008751] p-5 rounded-2xl shadow-2xl flex items-center justify-between gap-6 min-w-[320px] text-black">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-green-50 rounded-xl">
                         <Navigation size={20} className="text-[#008751]" />
                     </div>
                     <div>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Active Mission</p>
-                        <p className="text-xs font-black text-black leading-tight truncate max-w-[150px]">En Route to Pickup</p>
+                        <p className="text-xs font-black leading-tight truncate max-w-[150px]">En Route to Pickup</p>
                     </div>
                 </div>
                 
-                {/* CANCEL MISSION BUTTON */}
-                <button 
-                  onClick={handleCancelTrip}
-                  className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors flex flex-col items-center gap-1 group"
-                >
-                  <XCircle size={20} className="group-hover:rotate-90 transition-transform" />
-                  <span className="text-[8px] font-black uppercase">Cancel</span>
+                <button onClick={handleCancelTrip} className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors flex flex-col items-center gap-1">
+                  <XCircle size={20} />
+                  <span className="text-[8px] font-black uppercase tracking-tighter">Cancel</span>
                 </button>
            </div>
         </div>
       )}
 
-      <div className="absolute bottom-8 left-8 right-8 lg:left-auto lg:right-10 lg:w-[450px] z-10">
+      <div className="absolute bottom-8 left-8 right-8 lg:left-auto lg:right-10 lg:w-[450px] z-10 text-black">
         <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
           <div className="flex items-center justify-between mb-8 px-2">
-            <h3 className="font-black text-black flex items-center gap-3 tracking-tighter text-xl uppercase">
+            <h3 className="font-black flex items-center gap-3 tracking-tighter text-xl uppercase">
                 <List size={22} className="text-[#008751]"/> Ride Requests
             </h3>
             {isRefreshing && <RefreshCw size={14} className="animate-spin text-gray-300" />}
