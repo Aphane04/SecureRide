@@ -50,6 +50,25 @@ const PassengerRide = () => {
 
   const { dangerDetected } = useAiMonitor(activeTripId);
 
+  // NEW: Recovery Effect - Check for existing active/searching trip on page load
+  useEffect(() => {
+    const recoverSession = async () => {
+        try {
+            const res = await tripAPI.getActiveTrip();
+            if (res.data) {
+                setActiveTripId(res.data.id);
+                // If it's already active (driver accepted), load details
+                if (res.data.status === 'Active') {
+                    setActiveTripDetails(res.data);
+                }
+            }
+        } catch (err) {
+            // No active trip found, which is fine
+        }
+    };
+    recoverSession();
+  }, []);
+
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) return alert("Geolocation not supported");
     setIsLocating(true);
@@ -73,7 +92,6 @@ const PassengerRide = () => {
       setActiveTripDetails(null);
       setDirectionsResponse(null);
       setBookingMessage('');
-      setFare(null);
     } catch (err) { alert("Failed to cancel trip."); }
   };
 
@@ -111,42 +129,39 @@ const PassengerRide = () => {
           fare: fare,
         });
         setActiveTripId(response.data.id);
-        // Step 1: Initial state after clicking button
-        setBookingMessage('BROADCASTING REQUEST TO NEARBY DRIVERS...');
+        setBookingMessage('BROADCASTING REQUEST...');
     } catch (err) { console.error(err); }
   };
 
-  // POLLING LOGIC RE-ENGINEERED
+  // POLLING LOGIC
   useEffect(() => {
     if (!activeTripId) return;
 
     const poll = async () => {
       try {
         const res = await tripAPI.getActiveTrip();
-        
-        // Check if the trip returned by the server matches our request AND is "Active"
         if (res.data && res.data.id === activeTripId && res.data.status === 'Active') {
             setActiveTripDetails(res.data);
-            setBookingMessage('DRIVER MATCH CONFIRMED! MISSION ACTIVE');
+            setBookingMessage('DRIVER MATCHED!');
         } else {
-            // Keep searching if status is still "Searching"
-            setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
+            setBookingMessage('SEARCHING...');
         }
       } catch (err) {
-        // If 404, backend doesn't see an "Active" trip yet.
         if (err.response?.status === 404) {
-            setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
+            setBookingMessage('SEARCHING...');
         }
       }
     };
 
     poll();
-    const timer = setInterval(poll, 4000); // Polling every 4 seconds
+    const timer = setInterval(poll, 4000);
     return () => clearInterval(timer);
   }, [activeTripId]);
 
+  // Sync route on map when trip becomes active
   useEffect(() => {
-    if (!activeTripDetails || directionsResponse || !window.google) return;
+    if (!activeTripDetails || !window.google) return;
+    
     const service = new window.google.maps.DirectionsService();
     service.route({
         origin: activeTripDetails.pickup_location,
@@ -155,17 +170,16 @@ const PassengerRide = () => {
       },
       (result, status) => { if (status === 'OK') setDirectionsResponse(result); }
     );
-  }, [activeTripDetails, directionsResponse]);
+  }, [activeTripDetails]);
 
-  if (loadError) return <div className="p-10 text-red-500 font-bold text-center uppercase tracking-widest">Map System Failure</div>;
-  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing Secure Maps...</div>;
+  if (loadError) return <div className="p-10 text-red-500 font-bold text-center">Map System Failure</div>;
+  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase animate-pulse">Initializing...</div>;
 
   const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400";
   const labelClass = "text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1";
 
   return (
     <div className="h-full bg-white flex flex-col font-sans">
-      
       <div className="h-[52%] relative border-b border-gray-100">
         <GoogleMap center={center} zoom={15} mapContainerStyle={{ width: '100%', height: '100%' }} options={{ disableDefaultUI: true }}>
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
@@ -176,7 +190,7 @@ const PassengerRide = () => {
           {activeTripDetails && (
             <div className={`px-5 py-2.5 rounded-full flex items-center gap-3 border shadow-2xl transition-all ${dangerDetected ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-white border-gray-100 text-black'}`}>
               <div className={`w-2 h-2 rounded-full ${dangerDetected ? 'bg-white' : 'bg-[#008751] animate-ping'}`} />
-              <span className="text-[10px] font-black uppercase tracking-widest">
+              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
                 {dangerDetected ? 'AI DANGER ALERT' : 'Live Trip Monitored'}
               </span>
             </div>
@@ -190,7 +204,6 @@ const PassengerRide = () => {
             <h2 className="text-2xl font-black text-black tracking-tight flex items-center gap-2 uppercase">
                 <Shield className="text-[#008751]" size={24} /> Secure Ride
             </h2>
-            
             <div className="flex items-center gap-3">
                 {activeTripId && (
                     <button onClick={handleCancelTrip} className="bg-red-50 text-red-600 border border-red-100 px-4 py-1.5 rounded-full flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all">
@@ -217,7 +230,6 @@ const PassengerRide = () => {
                 </button>
               </div>
             </div>
-
             <div className="flex flex-col">
               <label className={labelClass}>Destination Point</label>
               <div className="relative">
@@ -238,7 +250,6 @@ const PassengerRide = () => {
             </button>
           </div>
 
-          {/* DYNAMIC STATUS DISPLAY */}
           {activeTripId && (
             <div className="mb-8 p-8 border border-gray-100 rounded-[2.5rem] bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-700">
                {activeTripDetails ? (
@@ -247,8 +258,8 @@ const PassengerRide = () => {
                         <CheckCircle2 size={40} className="text-[#008751]" />
                     </div>
                     <p className="text-sm font-black text-black uppercase tracking-tight">Driver Identified</p>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center">
-                        Secure pickup en route to {activeTripDetails.pickup_location}
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center leading-none">
+                        Secure pickup en route to target destination
                     </p>
                   </>
                ) : (
