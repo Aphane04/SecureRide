@@ -12,6 +12,9 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     profile = relationship("Profile", back_populates="user", uselist=False)
+    passenger = relationship("Passenger", back_populates="user", uselist=False)
+    driver = relationship("Driver", back_populates="user", uselist=False)
+    emergency_contacts = relationship("EmergencyContact", back_populates="user")
 
 class Profile(Base):
     __tablename__ = "profile"
@@ -23,19 +26,21 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column(String(255))
-     id_photo_url = Column(Text, nullable=True) # Matches LONGTEXT
+    id_photo_url = Column(Text, nullable=True) 
     user = relationship("User", back_populates="profile")
 
 class Passenger(Base):
     __tablename__ = "passenger"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     loyalty_points = Column(Integer, default=0)
+    user = relationship("User", back_populates="passenger")
 
 class Driver(Base):
     __tablename__ = "driver"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     license_number = Column(String(100))
     verification_status = Column(String(50), default="Pending")
+    user = relationship("User", back_populates="driver")
 
 class Vehicle(Base):
     __tablename__ = "vehicle"
@@ -43,7 +48,7 @@ class Vehicle(Base):
     driver_id = Column(Integer, ForeignKey("user.id"))
     make_model = Column(String(100))
     plate_number = Column(String(20))
-    photo_url = Column(Text, nullable=True) # Matches LONGTEXT
+    photo_url = Column(Text, nullable=True) 
 
 class EmergencyContact(Base):
     __tablename__ = "emergency_contact"
@@ -52,6 +57,7 @@ class EmergencyContact(Base):
     name = Column(String(100))
     phone = Column(String(20))
     relationship_type = Column(String(50))
+    user = relationship("User", back_populates="emergency_contacts")
 
 class Trip(Base):
     __tablename__ = "trip"
