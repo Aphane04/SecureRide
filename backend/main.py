@@ -157,21 +157,51 @@ def update_profile(data: schemas.ProfileUpdate, user: models.User = Depends(get_
 @app.delete("/auth/users/me")
 def delete_current_user_account(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
-        user_trip_ids = [t.id for t in db.query(models.Trip).filter(or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id)).all()]
-        if user_trip_ids:
-            db.query(models.AiSafetyLog).filter(models.AiSafetyLog.trip_id.in_(user_trip_ids)).delete(synchronize_session=False)
-        db.query(models.Trip).filter(or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id)).delete(synchronize_session=False)
+        # 1. GET ALL TRIP IDs associated with this user
+        # We need these IDs to delete the AI Safety Logs first
+        user_trips = db.query(models.Trip).filter(
+            or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id)
+        ).all()
+        trip_ids = [t.id for t in user_trips]
+
+        # 2. DELETE AI SAFETY LOGS
+        # These are at the very bottom of the chain
+        if trip_ids:
+            db.query(models.AiSafetyLog).filter(models.AiSafetyLog.trip_id.in_(trip_ids)).delete(synchronize_session=False)
+
+        # 3. DELETE TRIPS
+        db.query(models.Trip).filter(
+            or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id)
+        ).delete(synchronize_session=False)
+
+        # 4. DELETE EMERGENCY CONTACTS
         db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == user.id).delete(synchronize_session=False)
+
+        # 5. DELETE VEHICLE & ROLE DATA (If Driver)
         if user.role == "Driver":
             db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).delete(synchronize_session=False)
             db.query(models.Driver).filter(models.Driver.user_id == user.id).delete(synchronize_session=False)
+
+        # 6. DELETE PASSENGER ROLE DATA (If Passenger)
+        if user.role == "Passenger":
+            db.query(models.Passenger).filter(models.Passenger.user_id == user.id).delete(synchronize_session=False)
+
+        # 7. DELETE PROFILE
         db.query(models.Profile).filter(models.Profile.user_id == user.id).delete(synchronize_session=False)
+
+        # 8. FINALLY DELETE THE USER
         db.delete(user)
+        
+        # Save all changes at once
         db.commit()
-        return {"message": "Purged"}
+        
+        print(f"✅ User {user.email} and all associated data purged.")
+        return {"message": "Account successfully terminated."}
+
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, detail=str(e))
+        print(f"❌ PURGE ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database constraint: {str(e)}")
 
 @app.post("/auth/consent/{user_id}")
 def record_consent(user_id: int):
