@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { tripAPI, vehicleAPI } from '../../utils/api';
 
+// FIX: Constants outside to prevent re-render flickering
 const libraries = ['places'];
 const center = { lat: -26.2041, lng: 28.0473 };
 
@@ -25,7 +26,7 @@ const DriverOverview = () => {
   const [directions, setDirections] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  const alertedTripId = useRef(null); // FIX: Prevents repeated alerts
+  const alertedTripId = useRef(null);
 
   useEffect(() => {
     const syncActiveTrip = async () => {
@@ -42,7 +43,7 @@ const DriverOverview = () => {
             return;
           }
           setActiveTrip(res.data);
-          alertedTripId.current = null; // Clear if trip is Active
+          alertedTripId.current = null;
         }
       } catch (err) {
         if (activeTrip) {
@@ -116,12 +117,14 @@ const DriverOverview = () => {
       if (vehiclePhoto) formData.append('photo', vehiclePhoto);
       await vehicleAPI.registerVehicle(formData);
       setShowVehicleForm(false);
+      setVehicleForm({ make_model: '', plate_number: '' });
+      setVehiclePhoto(null);
       alert('Vehicle Data Secured');
     } catch (err) { setUploadError('Registry sync failed.'); }
   };
 
-  if (loadError) return <div className="p-10 text-red-500 font-bold">Map System Error</div>;
-  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing...</div>;
+  if (loadError) return <div className="p-10 text-red-500 font-bold text-center">Map System Error</div>;
+  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase tracking-widest animate-pulse">Initializing Terminal...</div>;
 
   return (
     <div className="relative h-full bg-[#f3f4f6] overflow-hidden font-sans text-black">
@@ -148,15 +151,23 @@ const DriverOverview = () => {
                 <span className="text-[10px] font-black uppercase tracking-widest">{isOnline ? 'Scanning' : 'Offline'}</span>
             </div>
         </div>
+        
         <div className="flex items-center gap-3">
-            <button onClick={() => setShowVehicleForm(true)} className="p-3.5 rounded-2xl bg-white border border-gray-100 text-black shadow-xl hover:bg-gray-50 transition-colors"><Car size={20} /></button>
+            {/* UPDATED BUTTON: Added Label and Spacing */}
+            <button 
+              onClick={() => setShowVehicleForm(true)} 
+              className="px-5 py-3.5 rounded-2xl bg-white border border-gray-100 text-black shadow-xl hover:bg-gray-50 transition-all flex items-center gap-3 font-black text-[10px] uppercase tracking-widest"
+            >
+                <Car size={18} />
+                <span>Register Vehicle</span>
+            </button>
             <div className="p-3.5 rounded-2xl bg-white border border-gray-100 text-[#008751] shadow-xl"><CheckCircle size={20} /></div>
         </div>
       </div>
 
       {activeTrip && activeTrip.status !== 'Canceled' && (
         <div className="absolute top-24 left-6 z-10 animate-in slide-in-from-left-4 duration-500">
-           <div className="bg-white border-l-4 border-[#008751] p-5 rounded-2xl shadow-2xl flex items-center justify-between gap-6 min-w-[320px] text-black">
+           <div className="bg-white border-l-4 border-[#008751] p-5 rounded-2xl shadow-2xl flex items-center justify-between gap-6 min-w-[320px] text-black border border-gray-100">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-green-50 rounded-xl"><Navigation size={20} className="text-[#008751]" /></div>
                     <div>
@@ -181,7 +192,7 @@ const DriverOverview = () => {
 
           {!isOnline ? (
             <div className="py-12 text-center border-2 border-dashed border-gray-100 rounded-[2.5rem]">
-              <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] px-10 text-center">Connection Required</p>
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] px-10 text-center leading-relaxed">Connection Required to start receiving passenger missions</p>
             </div>
           ) : activeTrip ? (
             <div className="py-12 text-center bg-gray-50 rounded-[2.5rem] border border-gray-100">
@@ -194,8 +205,8 @@ const DriverOverview = () => {
             <div className="space-y-4 max-h-[380px] overflow-y-auto pr-2 custom-scrollbar">
               {rideRequests.map((trip) => (
                 <div key={trip.id} className="bg-white border border-gray-100 p-6 rounded-[2rem] hover:shadow-lg transition-all group relative">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="space-y-4">
+                  <div className="flex justify-between items-start mb-6 text-black">
+                    <div className="space-y-4 text-black">
                       <div className="flex items-start gap-3 text-gray-400 text-[11px] font-bold">
                         <MapPin size={14} /> <span className="truncate max-w-[200px]">{trip.pickup_location}</span>
                       </div>
@@ -205,13 +216,62 @@ const DriverOverview = () => {
                     </div>
                     <span className="text-[#008751] font-black text-2xl tracking-tighter">R{trip.fare}</span>
                   </div>
-                  <button onClick={() => acceptRide(trip.id)} className="w-full bg-black text-white py-4 rounded-2xl font-black text-[10px] tracking-[0.2em] hover:bg-[#008751] transition-all shadow-md">ACCEPT MISSION</button>
+                  <button onClick={() => acceptRide(trip.id)} className="w-full bg-black text-white py-4 rounded-2xl font-black text-[10px] tracking-[0.2em] hover:bg-[#008751] transition-all shadow-md active:scale-95">ACCEPT MISSION</button>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* RESTORED: Vehicle Registration Modal */}
+      {showVehicleForm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+          <div className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-in zoom-in duration-300">
+            <div className="mb-8">
+                <h3 className="text-black text-2xl font-black uppercase tracking-tight">Vehicle Registry</h3>
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Update your active fleet information</p>
+            </div>
+            
+            {uploadError && <div className="text-red-500 text-[10px] font-black uppercase mb-4">{uploadError}</div>}
+            
+            <div className="space-y-5">
+              <div className="flex flex-col gap-1.5 text-left">
+                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Make & Model</label>
+                  <input
+                    className="w-full bg-gray-50 p-4 rounded-2xl text-black outline-none border border-gray-100 focus:border-green-500 transition-all text-sm font-bold"
+                    placeholder="e.g. Toyota Corolla"
+                    value={vehicleForm.make_model}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, make_model: e.target.value })}
+                  />
+              </div>
+
+              <div className="flex flex-col gap-1.5 text-left">
+                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">License Plate</label>
+                  <input
+                    className="w-full bg-gray-50 p-4 rounded-2xl text-black outline-none border border-gray-100 focus:border-green-500 transition-all text-sm font-bold"
+                    placeholder="e.g. ABC 123 GP"
+                    value={vehicleForm.plate_number}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
+                  />
+              </div>
+
+              <label className="border-2 border-dashed border-gray-100 bg-gray-50 p-8 rounded-3xl text-center group cursor-pointer hover:border-[#008751] hover:bg-green-50 transition-all block">
+                <Camera className="mx-auto mb-3 text-gray-300 group-hover:text-[#008751]" size={32} />
+                <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">
+                  {vehiclePhoto ? vehiclePhoto.name : 'Upload Vehicle Photography'}
+                </p>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setVehiclePhoto(e.target.files?.[0] || null)} />
+              </label>
+
+              <div className="flex gap-4 mt-8">
+                <button onClick={submitVehicle} className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#008751] transition-all shadow-lg active:scale-95">Sync Data</button>
+                <button onClick={() => setShowVehicleForm(false)} className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
