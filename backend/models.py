@@ -23,7 +23,7 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column(String(255))
-    id_photo_url = Column(Text, nullable=True) # Matches LONGTEXT
+     id_photo_url = Column(Text, nullable=True) # Matches LONGTEXT
     user = relationship("User", back_populates="profile")
 
 class Passenger(Base):

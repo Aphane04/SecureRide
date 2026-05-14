@@ -16,17 +16,28 @@ const PassengerDash = () => {
   // NEW: Logic to permanently delete the account
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
-      "CRITICAL: Are you sure you want to permanently delete your account? This action cannot be undone and all biometric data will be purged."
+      "CRITICAL: Are you sure you want to permanently delete your account? This will purge all your trip history and biometric data. This action is irreversible."
     );
 
     if (confirmed) {
       try {
+        // 1. Call the API
         await authAPI.deleteAccount();
-        localStorage.clear(); // Wipe tokens
-        alert("Account Deleted Successfully.");
-        navigate('/register'); // Send back to registration
+        
+        // 2. Clear all local data
+        localStorage.clear(); 
+        
+        // 3. Success feedback
+        alert("Account purged successfully. Redirecting to registry.");
+        
+        // 4. Force a hard reload to the register page to clear React state
+        window.location.href = '/register'; 
+        
       } catch (err) {
-        alert("Action failed. Please try again later.");
+        // This will tell you EXACTLY why the backend is refusing to delete
+        const errorDetail = err.response?.data?.detail || "Connection Error";
+        console.error("Purge Error:", errorDetail);
+        alert(`System Error: ${errorDetail}. (Note: You may need to cancel active trips before deleting)`);
       }
     }
   };
