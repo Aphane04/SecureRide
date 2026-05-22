@@ -289,3 +289,13 @@ def bulk_delete(data: List[int], user: models.User = Depends(get_current_user), 
     ensure_admin(user)
     for uid in [i for i in data if i != user.id]: perform_deep_purge(uid, db)
     db.commit(); return {"status": "ok"}
+
+@app.patch("/admin/alerts/{alert_id}/resolve")
+def resolve_alert(alert_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    log = db.query(models.AiSafetyLog).filter(models.AiSafetyLog.id == alert_id).first()
+    if not log:
+        raise HTTPException(status_code=404)
+    log.is_resolved = True
+    db.commit()
+    return {"message": "Incident resolved"}

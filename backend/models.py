@@ -79,6 +79,7 @@ class AiSafetyLog(Base):
     trip_id = Column(Integer, ForeignKey("trip.id"))
     transcript = Column(Text)
     detected_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_resolved = Column(Boolean, default=False)
 
 class Admin(Base):
     __tablename__ = "admin"

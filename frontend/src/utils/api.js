@@ -64,6 +64,7 @@ export const adminAPI = {
   getNotifications: () => api.get('/admin/notifications'),
    getAllUsers: () => api.get('/admin/users'),
   bulkDelete: (ids) => api.post('/admin/users/bulk-delete', ids),
+   resolveAlert: (alertId) => api.patch(`/admin/alerts/${alertId}/resolve`)
 };
 
 export default api;

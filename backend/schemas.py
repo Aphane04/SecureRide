@@ -111,6 +111,7 @@ class AdminAlertOut(BaseModel):
     id: int
     transcript: str
     detected_at: datetime
+    is_resolved: bool
     trip: AlertTripDetail
     passenger: AlertUserDetail
     driver: AlertUserDetail
