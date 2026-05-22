@@ -3,7 +3,8 @@ import { GoogleMap, useJsApiLoader, Autocomplete, DirectionsRenderer, MarkerF } 
 import { useAiMonitor } from '../../utils/aiMonitor';
 import { 
   Shield, MapPin, Navigation, Search, Info, 
-  CreditCard, Ruler, Clock as ClockIcon, LocateFixed, XCircle, Loader2, CheckCircle2
+  CreditCard, Ruler, Clock as ClockIcon, LocateFixed, 
+  XCircle, Loader2, CheckCircle2, User, Car 
 } from 'lucide-react';
 import { tripAPI } from '../../utils/api';
 
@@ -47,7 +48,7 @@ const PassengerRide = () => {
 
   const originRef = useRef();
   const destinationRef = useRef();
-  const alertedTripId = useRef(null); // FIX: Prevents repeated alerts
+  const alertedTripId = useRef(null);
 
   const { dangerDetected } = useAiMonitor(activeTripId);
 
@@ -95,7 +96,7 @@ const PassengerRide = () => {
     if (!window.confirm("Abort this ride request?")) return;
     try {
       await tripAPI.cancelTrip(activeTripId);
-      alertedTripId.current = activeTripId; // Mark as handled
+      alertedTripId.current = activeTripId;
       resetUI();
     } catch (err) { alert("Cancellation failed."); }
   };
@@ -134,7 +135,7 @@ const PassengerRide = () => {
           fare: fare,
         });
         setActiveTripId(response.data.id);
-        alertedTripId.current = null; // Reset alert memory for new trip
+        alertedTripId.current = null;
         setBookingMessage('SEARCHING FOR NEARBY DRIVERS...');
     } catch (err) { console.error(err); }
   };
@@ -146,7 +147,6 @@ const PassengerRide = () => {
       try {
         const res = await tripAPI.getActiveTrip();
         if (res.data) {
-          // One-time alert for cancellation
           if (res.data.status === 'Canceled') {
             if (alertedTripId.current !== res.data.id) {
               alertedTripId.current = res.data.id;
@@ -183,11 +183,11 @@ const PassengerRide = () => {
   }, [activeTripDetails]);
 
   if (loadError) return <div className="p-10 text-red-500 font-bold text-center">Map Failure</div>;
-  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs animate-pulse tracking-widest uppercase">Initializing...</div>;
+  if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs animate-pulse tracking-widest uppercase">Initializing Secure Terminal...</div>;
 
   return (
     <div className="h-full bg-white flex flex-col font-sans">
-      <div className="h-[52%] relative border-b border-gray-100">
+      <div className="h-[52%] relative border-b border-gray-100 text-black">
         <GoogleMap center={center} zoom={15} mapContainerStyle={{ width: '100%', height: '100%' }} options={{ disableDefaultUI: true }}>
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
           {!directionsResponse && <MarkerF position={center} />}
@@ -224,44 +224,74 @@ const PassengerRide = () => {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 mb-8 text-black">
-            <div className="flex flex-col relative">
-              <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Starting Terminal</label>
-              <MapPin className="absolute left-3 top-9 text-gray-400" size={16} />
-              <Autocomplete className="w-full">
-                <input ref={originRef} placeholder="Pickup Address" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
-              </Autocomplete>
-              <button onClick={handleUseCurrentLocation} disabled={isLocating} className="absolute right-3 top-8 p-1 hover:bg-gray-200 rounded-md text-[#008751]">
-                <LocateFixed size={18} className={isLocating ? 'animate-spin opacity-50' : ''} />
-              </button>
+          {!activeTripId && (
+            <div className="grid md:grid-cols-2 gap-6 mb-8 text-black">
+                <div className="flex flex-col relative">
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Starting Terminal</label>
+                <MapPin className="absolute left-3 top-9 text-gray-400" size={16} />
+                <Autocomplete className="w-full">
+                    <input ref={originRef} placeholder="Pickup Address" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
+                </Autocomplete>
+                <button onClick={handleUseCurrentLocation} disabled={isLocating} className="absolute right-3 top-8 p-1 hover:bg-gray-200 rounded-md text-[#008751]">
+                    <LocateFixed size={18} className={isLocating ? 'animate-spin opacity-50' : ''} />
+                </button>
+                </div>
+                <div className="flex flex-col relative">
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Destination Point</label>
+                <Navigation className="absolute left-3 top-9 text-[#008751]" size={16} />
+                <Autocomplete className="w-full">
+                    <input ref={destinationRef} placeholder="Where to?" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
+                </Autocomplete>
+                </div>
             </div>
-            <div className="flex flex-col relative">
-              <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Destination Point</label>
-              <Navigation className="absolute left-3 top-9 text-[#008751]" size={16} />
-              <Autocomplete className="w-full">
-                <input ref={destinationRef} placeholder="Where to?" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
-              </Autocomplete>
+          )}
+
+          {!activeTripId && (
+            <div className="flex flex-col md:flex-row gap-4 mb-8">
+                <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm">Calculate Fare</button>
+                <button onClick={requestRide} disabled={!fare} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">Request Transport</button>
             </div>
-          </div>
+          )}
 
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <button onClick={calculateRoute} className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm">Calculate Fare</button>
-            <button onClick={requestRide} disabled={!fare || activeTripId} className="flex-1 bg-black hover:bg-[#008751] text-white disabled:opacity-20 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">Request Transport</button>
-          </div>
-
+          {/* SEARCHING / MATCHED STATUS BOX */}
           {activeTripId && (
             <div className="mb-8 p-8 border border-gray-100 rounded-[2.5rem] bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-700 text-black">
                {activeTripDetails ? (
-                  <>
-                    <div className="bg-[#008751]/10 p-4 rounded-full mb-4"><CheckCircle2 size={40} className="text-[#008751]" /></div>
-                    <p className="text-sm font-black uppercase tracking-tight">Driver Identified</p>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center">Secure pickup en route to target destination</p>
-                  </>
+                  <div className="w-full flex flex-col items-center">
+                    <div className="bg-[#008751]/10 p-4 rounded-full mb-6">
+                        <CheckCircle2 size={40} className="text-[#008751]" />
+                    </div>
+                    <h3 className="text-xl font-black uppercase tracking-tight mb-8">Driver Dispatched</h3>
+                    
+                    {/* DRIVER INFORMATION CARD */}
+                    <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-white p-6 rounded-3xl border border-gray-200 flex items-center gap-5 shadow-sm">
+                            <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center text-white">
+                                <User size={20} />
+                            </div>
+                            <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Assigned Pilot</p>
+                                <p className="text-sm font-black text-black">{activeTripDetails.driver_name || 'Verified Driver'}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-3xl border border-gray-200 flex items-center gap-5 shadow-sm">
+                            <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-[#008751]">
+                                <Car size={20} />
+                            </div>
+                            <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Secure Vehicle</p>
+                                <p className="text-sm font-black text-black">
+                                    {activeTripDetails.vehicle_model || 'Standard Unit'} • <span className="text-[#008751]">{activeTripDetails.vehicle_plate || 'AUTH-001'}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                  </div>
                ) : (
                   <>
                     <Loader2 size={40} className="text-[#008751] animate-spin mb-4" />
                     <p className="text-sm font-black uppercase tracking-tight">Searching for Driver</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 text-center">AI Protocol: Scanning local network...</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 text-center">Neural Protocol: Linking to local operator network...</p>
                   </>
                )}
             </div>

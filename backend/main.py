@@ -178,8 +178,30 @@ def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db:
 
 @app.get("/trips/active", response_model=schemas.TripOut)
 def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    trip = db.query(models.Trip).filter(or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id), models.Trip.status.in_(["Active", "Searching", "Canceled"])).order_by(models.Trip.start_time.desc()).first()
-    if not trip: raise HTTPException(404)
+    # 1. Find the trip (Searching, Active, or Canceled)
+    trip = db.query(models.Trip).filter(
+        or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id),
+        models.Trip.status.in_(["Active", "Searching", "Canceled"])
+    ).order_by(models.Trip.start_time.desc()).first()
+
+    if not trip:
+        raise HTTPException(status_code=404, detail="No active mission")
+
+    # 2. If trip is Active, fetch Driver and Vehicle details
+    if trip.status == "Active" and trip.driver_id:
+        driver_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
+        # Find the vehicle linked to this driver
+        vehicle = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
+        
+        # Attach details dynamically to the trip object
+        trip.driver_name = driver_user.profile.full_name if (driver_user and driver_user.profile) else "Authorized Pilot"
+        if vehicle:
+            trip.vehicle_model = vehicle.make_model
+            trip.vehicle_plate = vehicle.plate_number
+        else:
+            trip.vehicle_model = "Verified Vehicle"
+            trip.vehicle_plate = "AUTH-SCAN"
+
     return trip
 
 @app.post("/trips/{trip_id}/cancel")

@@ -171,6 +171,9 @@ class TripOut(BaseModel):
     passenger_id: Optional[int] = None
     driver_id: Optional[int] = None
     payment_method: Optional[str] = "Cash"
+    driver_name: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    vehicle_plate: Optional[str] = None
     
     class Config:
         from_attributes = True
