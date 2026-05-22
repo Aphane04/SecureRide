@@ -1,19 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { History, Phone, User, Map as MapIcon, UserX, ChevronRight, ShieldCheck } from 'lucide-react';
-import { authAPI } from '../../utils/api';
+import { 
+  History, Phone, User, Map as MapIcon, UserX, 
+  ChevronRight, ShieldCheck, Activity, AlertTriangle 
+} from 'lucide-react';
+import { authAPI, tripAPI } from '../../utils/api';
+import { useAiMonitor } from '../../utils/aiMonitor'; // Import the monitor
 
 const DriverDash = () => {
   const [fullName, setFullName] = useState('Driver');
+  const [activeTripId, setActiveTripId] = useState(null);
   const navigate = useNavigate();
 
+  // Initialize AI Monitoring logic
+  const { dangerDetected } = useAiMonitor(activeTripId);
+
   useEffect(() => {
+    // 1. Get User Profile
     authAPI.getProfile().then((res) => {
       if (res.data?.full_name) setFullName(res.data.full_name);
     });
+
+    // 2. Initial Active Trip Check
+    const checkActiveTrip = async () => {
+      try {
+        const res = await tripAPI.getActiveTrip();
+        if (res.data && res.data.status === 'Active') {
+          setActiveTripId(res.data.id);
+        } else {
+          setActiveTripId(null);
+        }
+      } catch (err) {
+        setActiveTripId(null);
+      }
+    };
+
+    checkActiveTrip();
+    const interval = setInterval(checkActiveTrip, 10000); // Check every 10s for new missions
+    return () => clearInterval(interval);
   }, []);
 
-  // NEW: Logic to permanently delete the driver account
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
       "CRITICAL: Are you sure you want to permanently delete your Driver Account? This will purge all records. This cannot be undone."
@@ -24,9 +50,8 @@ const DriverDash = () => {
         await authAPI.deleteAccount();
         localStorage.clear();
         alert("Account Terminated.");
-        window.location.href = '/register'; // Using href for a clean hard-redirect
+        window.location.href = '/register';
       } catch (err) {
-        // Show the actual reason for failure
         const reason = err.response?.data?.detail || "Unknown Server Error";
         alert(`System Error: ${reason}. Please contact system administrator.`);
       }
@@ -43,18 +68,30 @@ const DriverDash = () => {
   return (
     <div className="flex h-[calc(100vh-64px)] bg-white font-sans overflow-hidden text-black">
       
-      {/* SIDEBAR: Pure White & Professional */}
+      {/* SIDEBAR */}
       <aside className="w-72 bg-white border-r border-gray-200 p-8 flex flex-col justify-between z-20">
         <div>
-          {/* Driver Branding */}
+          {/* Driver Branding & Safety Status */}
           <div className="mb-12 px-2">
-            <div className="flex items-center gap-2 mb-1 text-[#008751]">
-                <ShieldCheck size={14} />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Verified Driver</span>
+            <div className={`flex items-center gap-2 mb-1 transition-colors duration-500 ${dangerDetected ? 'text-red-600' : 'text-[#008751]'}`}>
+                {dangerDetected ? <AlertTriangle size={14} className="animate-bounce" /> : <ShieldCheck size={14} />}
+                <span className="text-[10px] font-black uppercase tracking-[0.3em]">
+                  {dangerDetected ? 'Safety Breach' : 'Verified Driver'}
+                </span>
             </div>
             <p className="text-2xl font-black text-black tracking-tighter truncate">
                 {fullName.split(' ')[0]}
             </p>
+
+            {/* AI Monitor Visual Feedback */}
+            {activeTripId && (
+              <div className={`mt-4 px-3 py-2 rounded-lg flex items-center gap-3 border ${dangerDetected ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-100'}`}>
+                <Activity size={12} className={dangerDetected ? 'text-red-600' : 'text-green-600 animate-pulse'} />
+                <span className={`text-[8px] font-black uppercase tracking-widest ${dangerDetected ? 'text-red-700' : 'text-green-700'}`}>
+                  AI Monitor Active
+                </span>
+              </div>
+            )}
           </div>
 
           <nav className="space-y-1.5">
@@ -90,7 +127,7 @@ const DriverDash = () => {
           </nav>
         </div>
 
-        {/* Action Bottom: Delete Account (Deep Red) */}
+        {/* Action Bottom */}
         <div className="pt-6 border-t border-gray-50">
           <button 
             onClick={handleDeleteAccount}
@@ -107,13 +144,6 @@ const DriverDash = () => {
             <Outlet />
         </div>
       </main>
-
-      <style>{`
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #008751; }
-      `}</style>
     </div>
   );
 };
