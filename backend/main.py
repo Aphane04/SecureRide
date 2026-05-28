@@ -68,7 +68,6 @@ def ensure_admin(user: models.User):
     if user.role != "Admin": raise HTTPException(status_code=403, detail="Admin access required")
 
 def perform_deep_purge(user_id: int, db: Session):
-    # Order: Logs -> Trips -> Contacts -> Vehicle -> Driver/Pass -> Profile -> User
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user: return
     trip_ids = [t.id for t in db.query(models.Trip).filter(or_(models.Trip.passenger_id == user_id, models.Trip.driver_id == user_id)).all()]
@@ -83,7 +82,7 @@ def perform_deep_purge(user_id: int, db: Session):
     db.delete(user)
 
 # ==========================================
-# ENDPOINTS
+# AUTHENTICATION & PROFILE
 # ==========================================
 
 @app.post("/auth/register", response_model=schemas.UserOut)
@@ -122,6 +121,7 @@ def get_me(user: models.User = Depends(get_current_user)):
 @app.put("/auth/users/me", response_model=schemas.UserProfileOut)
 def update_profile(data: schemas.ProfileUpdate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile
+    if not p: raise HTTPException(404, "Profile not found")
     if data.full_name: p.full_name = data.full_name
     if data.phone: p.phone = data.phone
     if data.address: p.physical_address = data.address
@@ -152,7 +152,10 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
     if user: user.is_verified = True; db.commit()
     return {"status": "ok"}
 
-# --- Trips ---
+# ==========================================
+# TRIPS & LIVE MOTION TRACKING
+# ==========================================
+
 @app.post("/trips/estimate", response_model=schemas.TripEstimateResponse)
 def estimate_trip(data: schemas.TripEstimateRequest):
     base, km, min = 20.0, 12.0, 2.5
@@ -178,31 +181,40 @@ def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db:
 
 @app.get("/trips/active", response_model=schemas.TripOut)
 def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # 1. Find the trip (Searching, Active, or Canceled)
     trip = db.query(models.Trip).filter(
         or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id),
-        models.Trip.status.in_(["Active", "Searching", "Canceled"])
+        models.Trip.status.in_(["Active", "Searching", "Canceled", "Completed"])
     ).order_by(models.Trip.start_time.desc()).first()
 
-    if not trip:
-        raise HTTPException(status_code=404, detail="No active mission")
+    if not trip: raise HTTPException(404)
 
-    # 2. If trip is Active, fetch Driver and Vehicle details
+    # Attach driver/vehicle info if trip is active
     if trip.status == "Active" and trip.driver_id:
         driver_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
-        # Find the vehicle linked to this driver
         vehicle = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
-        
-        # Attach details dynamically to the trip object
         trip.driver_name = driver_user.profile.full_name if (driver_user and driver_user.profile) else "Authorized Pilot"
         if vehicle:
             trip.vehicle_model = vehicle.make_model
             trip.vehicle_plate = vehicle.plate_number
-        else:
-            trip.vehicle_model = "Verified Vehicle"
-            trip.vehicle_plate = "AUTH-SCAN"
 
     return trip
+
+@app.patch("/trips/{trip_id}/location")
+def update_trip_location(trip_id: int, lat: float = Form(...), lng: float = Form(...), db: Session = Depends(get_db)):
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    if trip:
+        trip.current_lat = lat
+        trip.current_lng = lng
+        db.commit()
+    return {"status": "updated"}
+
+@app.post("/trips/{trip_id}/complete")
+def complete_trip(trip_id: int, db: Session = Depends(get_db)):
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    if trip:
+        trip.status = "Completed"
+        db.commit()
+    return {"status": "completed"}
 
 @app.post("/trips/{trip_id}/cancel")
 def cancel_trip(trip_id: int, db: Session = Depends(get_db)):
@@ -232,7 +244,8 @@ def trigger_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = 
 
 @app.post("/vehicles/register", response_model=schemas.VehicleOut)
 def register_vehicle(make_model: str = Form(...), plate_number: str = Form(...), photo: UploadFile = File(None), user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    photo_uri = f"data:{photo.content_type};base64,{base64.b64encode(photo.file.read()).decode('utf-8')}" if photo else None
+    if user.role != "Driver": raise HTTPException(403)
+    photo_uri = f"data:{photo.content_type};base64,{base64.b64encode(content).decode('utf-8')}" if photo else None
     v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=photo_uri)
     db.add(v); db.commit(); db.refresh(v); return v
 
@@ -294,8 +307,6 @@ def bulk_delete(data: List[int], user: models.User = Depends(get_current_user), 
 def resolve_alert(alert_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     log = db.query(models.AiSafetyLog).filter(models.AiSafetyLog.id == alert_id).first()
-    if not log:
-        raise HTTPException(status_code=404)
-    log.is_resolved = True
-    db.commit()
+    if not log: raise HTTPException(status_code=404)
+    log.is_resolved = True; db.commit()
     return {"message": "Incident resolved"}

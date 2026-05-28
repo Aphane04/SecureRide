@@ -26,8 +26,7 @@ export const authAPI = {
   verifyLiveness: (userId) => api.post(`/auth/verify-liveness/${userId}`),
   getProfile: () => api.get('/auth/users/me'),
   updateProfile: (data) => api.put('/auth/users/me', data),
-     deleteAccount: () => api.delete('/auth/users/me'),
-    
+  deleteAccount: () => api.delete('/auth/users/me'),
 };
 
 export const tripAPI = {
@@ -36,11 +35,20 @@ export const tripAPI = {
   getHistory: () => api.get('/trips/history'),
   getDriverHistory: () => api.get('/trips/driver-history'),
   getActiveTrip: () => api.get('/trips/active'),
-  updateLocation: (tripId, coords) => api.patch(`/trips/${tripId}/location`, coords),
+  // Updated to use FormData to match the Backend's Form(...) requirement
+  updateLocation: (tripId, lat, lng) => {
+    const formData = new FormData();
+    formData.append('lat', lat);
+    formData.append('lng', lng);
+    return api.patch(`/trips/${tripId}/location`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   triggerAlert: (tripId, transcript) => api.post(`/trips/${tripId}/emergency`, { transcript }),
- getRideRequests: () => api.get('/trips/requests'),
+  getRideRequests: () => api.get('/trips/requests'),
   acceptRide: (tripId) => api.post(`/trips/${tripId}/accept`),
   cancelTrip: (tripId) => api.post(`/trips/${tripId}/cancel`),
+  completeTrip: (tripId) => api.post(`/trips/${tripId}/complete`), // Added for Trip Completion
 };
 
 export const contactAPI = {
@@ -62,9 +70,9 @@ export const adminAPI = {
   passengers: () => api.get('/admin/passengers'),
   alerts: () => api.get('/admin/alerts'),
   getNotifications: () => api.get('/admin/notifications'),
-   getAllUsers: () => api.get('/admin/users'),
+  getAllUsers: () => api.get('/admin/users'),
   bulkDelete: (ids) => api.post('/admin/users/bulk-delete', ids),
-   resolveAlert: (alertId) => api.patch(`/admin/alerts/${alertId}/resolve`)
+  resolveAlert: (alertId) => api.patch(`/admin/alerts/${alertId}/resolve`)
 };
 
 export default api;

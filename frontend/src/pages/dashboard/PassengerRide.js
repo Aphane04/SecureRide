@@ -45,6 +45,7 @@ const PassengerRide = () => {
   const [distanceKm, setDistanceKm] = useState(0);
   const [durationMinutes, setDurationMinutes] = useState(0);
   const [isLocating, setIsLocating] = useState(false);
+  const [driverPos, setDriverPos] = useState(null);
 
   const originRef = useRef();
   const destinationRef = useRef();
@@ -52,11 +53,12 @@ const PassengerRide = () => {
 
   const { dangerDetected } = useAiMonitor(activeTripId);
 
+  // 1. RECOVERY: Check for active trip when component loads
   useEffect(() => {
     const recoverSession = async () => {
       try {
         const res = await tripAPI.getActiveTrip();
-        if (res.data && res.data.status !== 'Canceled') {
+        if (res.data && res.data.status !== 'Canceled' && res.data.status !== 'Completed') {
           setActiveTripId(res.data.id);
           if (res.data.status === 'Active') setActiveTripDetails(res.data);
         }
@@ -87,6 +89,7 @@ const PassengerRide = () => {
     setFare(null);
     setDistance('');
     setDuration('');
+    setDriverPos(null);
     if (originRef.current) originRef.current.value = '';
     if (destinationRef.current) destinationRef.current.value = '';
   };
@@ -140,6 +143,7 @@ const PassengerRide = () => {
     } catch (err) { console.error(err); }
   };
 
+  // 2. POLLING: Watch for Driver acceptance, Motion, or Cancellation
   useEffect(() => {
     if (!activeTripId) return;
 
@@ -147,6 +151,7 @@ const PassengerRide = () => {
       try {
         const res = await tripAPI.getActiveTrip();
         if (res.data) {
+          // Detect Driver Cancellation
           if (res.data.status === 'Canceled') {
             if (alertedTripId.current !== res.data.id) {
               alertedTripId.current = res.data.id;
@@ -155,6 +160,20 @@ const PassengerRide = () => {
             }
             return;
           }
+
+          // Detect Completion
+          if (res.data.status === 'Completed') {
+              alert("Mission Accomplished: You have reached your destination.");
+              resetUI();
+              return;
+          }
+
+          // Update Motion Tracking
+          if (res.data.current_lat && res.data.current_lng) {
+              setDriverPos({ lat: res.data.current_lat, lng: res.data.current_lng });
+          }
+
+          // Set Active Details
           if (res.data.status === 'Active') {
             setActiveTripDetails(res.data);
             setBookingMessage('DRIVER MATCHED!');
@@ -166,10 +185,11 @@ const PassengerRide = () => {
     };
 
     poll();
-    const timer = setInterval(poll, 5000);
+    const timer = setInterval(poll, 4000);
     return () => clearInterval(timer);
   }, [activeTripId]);
 
+  // 3. MAP SYNC: Draw route when details are matched
   useEffect(() => {
     if (!activeTripDetails || !window.google) return;
     const service = new window.google.maps.DirectionsService();
@@ -189,8 +209,19 @@ const PassengerRide = () => {
     <div className="h-full bg-white flex flex-col font-sans">
       <div className="h-[52%] relative border-b border-gray-100 text-black">
         <GoogleMap center={center} zoom={15} mapContainerStyle={{ width: '100%', height: '100%' }} options={{ disableDefaultUI: true }}>
-          {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
+          {directionsResponse && <DirectionsRenderer directions={directionsResponse} options={{ polylineOptions: { strokeColor: '#008751', strokeWeight: 6 } }} />}
           {!directionsResponse && <MarkerF position={center} />}
+          
+          {/* LIVE DRIVER MARKER */}
+          {driverPos && (
+              <MarkerF 
+                position={driverPos} 
+                icon={{
+                    url: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png", // CAR ICON
+                    scaledSize: new window.google.maps.Size(40, 40)
+                }}
+              />
+          )}
         </GoogleMap>
 
         <div className="absolute top-6 left-6 z-10">
@@ -227,21 +258,21 @@ const PassengerRide = () => {
           {!activeTripId && (
             <div className="grid md:grid-cols-2 gap-6 mb-8 text-black">
                 <div className="flex flex-col relative">
-                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Starting Terminal</label>
-                <MapPin className="absolute left-3 top-9 text-gray-400" size={16} />
-                <Autocomplete className="w-full">
-                    <input ref={originRef} placeholder="Pickup Address" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
-                </Autocomplete>
-                <button onClick={handleUseCurrentLocation} disabled={isLocating} className="absolute right-3 top-8 p-1 hover:bg-gray-200 rounded-md text-[#008751]">
-                    <LocateFixed size={18} className={isLocating ? 'animate-spin opacity-50' : ''} />
-                </button>
+                    <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Starting Terminal</label>
+                    <MapPin className="absolute left-3 top-9 text-gray-400" size={16} />
+                    <Autocomplete className="w-full">
+                        <input ref={originRef} placeholder="Pickup Address" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all" />
+                    </Autocomplete>
+                    <button onClick={handleUseCurrentLocation} disabled={isLocating} className="absolute right-3 top-8 p-1 hover:bg-gray-200 rounded-md text-[#008751]">
+                        <LocateFixed size={18} className={isLocating ? 'animate-spin opacity-50' : ''} />
+                    </button>
                 </div>
                 <div className="flex flex-col relative">
-                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Destination Point</label>
-                <Navigation className="absolute left-3 top-9 text-[#008751]" size={16} />
-                <Autocomplete className="w-full">
-                    <input ref={destinationRef} placeholder="Where to?" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all placeholder:text-gray-400" />
-                </Autocomplete>
+                    <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1 ml-1">Destination Point</label>
+                    <Navigation className="absolute left-3 top-9 text-[#008751]" size={16} />
+                    <Autocomplete className="w-full">
+                        <input ref={destinationRef} placeholder="Where to?" className="w-full bg-gray-100 border border-gray-200 p-3 pl-10 pr-10 rounded-xl text-sm focus:border-green-500 focus:bg-white outline-none transition-all" />
+                    </Autocomplete>
                 </div>
             </div>
           )}
@@ -253,36 +284,29 @@ const PassengerRide = () => {
             </div>
           )}
 
-          {/* SEARCHING / MATCHED STATUS BOX */}
+          {/* DYNAMIC SEARCHING / MATCHED STATUS BOX */}
           {activeTripId && (
             <div className="mb-8 p-8 border border-gray-100 rounded-[2.5rem] bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-700 text-black">
                {activeTripDetails ? (
-                  <div className="w-full flex flex-col items-center">
+                  <div className="w-full flex flex-col items-center text-black">
                     <div className="bg-[#008751]/10 p-4 rounded-full mb-6">
                         <CheckCircle2 size={40} className="text-[#008751]" />
                     </div>
                     <h3 className="text-xl font-black uppercase tracking-tight mb-8">Driver Dispatched</h3>
                     
-                    {/* DRIVER INFORMATION CARD */}
                     <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 flex items-center gap-5 shadow-sm">
-                            <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center text-white">
-                                <User size={20} />
-                            </div>
+                            <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center text-white"><User size={20} /></div>
                             <div>
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Assigned Pilot</p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Assigned Pilot</p>
                                 <p className="text-sm font-black text-black">{activeTripDetails.driver_name || 'Verified Driver'}</p>
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 flex items-center gap-5 shadow-sm">
-                            <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-[#008751]">
-                                <Car size={20} />
-                            </div>
+                            <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-[#008751]"><Car size={20} /></div>
                             <div>
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Secure Vehicle</p>
-                                <p className="text-sm font-black text-black">
-                                    {activeTripDetails.vehicle_model || 'Standard Unit'} • <span className="text-[#008751]">{activeTripDetails.vehicle_plate || 'AUTH-001'}</span>
-                                </p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Secure Vehicle</p>
+                                <p className="text-sm font-black text-black uppercase">{activeTripDetails.vehicle_model || 'Security Unit'} • <span className="text-[#008751]">{activeTripDetails.vehicle_plate || '---'}</span></p>
                             </div>
                         </div>
                     </div>
@@ -312,7 +336,7 @@ const PassengerRide = () => {
 };
 
 const ResultCard = ({ icon, label, value, isGreen }) => (
-    <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl">
+    <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl text-black">
         <div className="flex items-center gap-2 mb-1 text-gray-400">
             {icon}
             <span className="text-[9px] font-bold uppercase tracking-widest">{label}</span>
