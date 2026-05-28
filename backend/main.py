@@ -87,30 +87,48 @@ def perform_deep_purge(user_id: int, db: Session):
     db.delete(user)
 
 def send_emergency_email(trip_id, transcript, passenger_name, driver_name):
+    print("------- EMAIL SYSTEM START -------")
+    
     recipient = os.getenv("TRACKING_COMPANY_EMAIL")
     sender = os.getenv("SMTP_USER")
     password = os.getenv("SMTP_PASSWORD")
-    if not all([recipient, sender, password]): return
+    server_host = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 
-    subject = f"[URGENT] SecureRide Safety Breach - Trip #{trip_id}"
-    body = f"""
-    SECURE-RIDE SAFETY BUREAU: INCIDENT REPORT
-    ------------------------------------------
-    CASE REFERENCE: #SR-ALERT-{trip_id}
-    01. AI EVIDENCE TRANSCRIPT: "{transcript}"
-    02. PASSENGER: {passenger_name}
-    03. DRIVER: {driver_name}
-    Live tracking: https://secure-ride-zeta.vercel.app/dashboard/admin/alerts
-    ------------------------------------------
-    """
+    # DIAGNOSTIC: Check if Render actually sees your variables
+    if not recipient: print("❌ ERROR: TRACKING_COMPANY_EMAIL is missing in Render Settings")
+    if not sender: print("❌ ERROR: SMTP_USER is missing in Render Settings")
+    if not password: print("❌ ERROR: SMTP_PASSWORD is missing in Render Settings")
+
+    if not all([recipient, sender, password]):
+        print("🛑 STOPPING: Missing credentials. Cannot send email.")
+        return
+
+    print(f"📡 ATTEMPTING DISPATCH: From {sender} To {recipient}")
+
+    subject = f"[CRITICAL] SecureRide Safety Alert - Trip #{trip_id}"
+    body = f"Incident Report\nTrip ID: {trip_id}\nPassenger: {passenger_name}\nDriver: {driver_name}\nAI Transcript: {transcript}"
+
     msg = MIMEMultipart()
     msg['From'], msg['To'], msg['Subject'] = sender, recipient, subject
     msg.attach(MIMEText(body, 'plain'))
+
     try:
-        server = smtplib.SMTP(os.getenv("SMTP_SERVER", "smtp.gmail.com"), 587)
-        server.starttls(); server.login(sender, password)
-        server.sendmail(sender, recipient, msg.as_string()); server.quit()
-    except Exception as e: print(f"Email failure: {e}")
+        # METHOD: Use SSL (Port 465) which is more stable on Render
+        print("🔗 Connecting to Google SSL Port 465...")
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        
+        print("🔑 Logging in...")
+        server.login(sender, password)
+        
+        print("📧 Sending data...")
+        server.sendmail(sender, recipient, msg.as_string())
+        
+        server.quit()
+        print("✅ SUCCESS: Email delivered to tracking company.")
+    except Exception as e:
+        print(f"❌ CRITICAL SMTP ERROR: {str(e)}")
+    
+    print("------- EMAIL SYSTEM END -------")
 
 # ==========================================
 # ENDPOINTS
