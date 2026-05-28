@@ -42,45 +42,36 @@ const Register = () => {
     }
   };
 
-  // Helper to update state and handle ID Parsing logic
   const handleChange = (field, value) => {
     let updatedData = { ...formData, [field]: value };
 
-    // ID Parsing Logic (South African ID Format)
     if (field === 'idNumber' && value.length === 13) {
       const idStr = value;
-      
-      // 1. Extract DOB
       const yy = idStr.substring(0, 2);
       const mm = idStr.substring(2, 4);
       const dd = idStr.substring(4, 6);
-      
-      // Determine century (if yy > current year, assume 1900s, else 2000s)
       const currentYearShort = new Date().getFullYear() % 100;
       const century = parseInt(yy) <= currentYearShort ? "20" : "19";
       const dobFormatted = `${century}${yy}-${mm}-${dd}`;
-
-      // 2. Extract Gender (Digits 7-10. < 5000 is Female, >= 5000 is Male)
       const genderCode = parseInt(idStr.substring(6, 10));
       const genderFormatted = genderCode < 5000 ? "Female" : "Male";
 
       updatedData.dob = dobFormatted;
       updatedData.gender = genderFormatted;
     }
-
     setFormData(updatedData);
   };
 
-  // Styling Classes
+  // Modern White Theme Styles
   const inputContainer = "flex flex-col gap-1";
-  const labelClass = "text-[9px] uppercase tracking-[0.2em] text-gray-500 font-bold ml-1";
-  const inputClass = "w-full bg-[#0d0d0d] border border-white/5 text-white p-2.5 rounded-lg focus:border-green-500 focus:bg-[#151515] outline-none transition-all text-xs placeholder:text-gray-800 appearance-none";
+  const labelClass = "text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold ml-1";
+  const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-2.5 rounded-lg focus:border-[#008751] focus:bg-white outline-none transition-all text-xs placeholder:text-gray-400 font-medium appearance-none";
 
   return (
-    <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-white text-black font-sans overflow-hidden">
       
       {/* LEFT SIDE: Identity Panel */}
-      <div className="hidden lg:flex lg:w-[30%] relative flex-col justify-between p-10 overflow-hidden border-r border-white/5">
+      <div className="hidden lg:flex lg:w-[30%] relative flex-col justify-between p-10 overflow-hidden border-r border-gray-100">
         <img 
           src={sideImage} 
           alt="SecureRide" 
@@ -88,9 +79,9 @@ const Register = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
 
-        <div className="relative z-10">
+        <div className="relative z-10 text-white">
           <div className="flex items-center gap-2 mb-8">
-            <div className="w-6 h-6 bg-green-600 rounded flex items-center justify-center shadow-[0_0_15px_rgba(34,197,94,0.4)]">
+            <div className="w-6 h-6 bg-[#008751] rounded flex items-center justify-center shadow-lg">
               <div className="w-2 h-2 bg-white rounded-sm" />
             </div>
             <span className="font-black text-sm tracking-tighter uppercase">SecureRide</span>
@@ -99,30 +90,30 @@ const Register = () => {
           <h1 className="text-4xl font-black tracking-tighter leading-tight mb-4">
             Get Started <br /> <span className="text-gray-400">with Us</span>
           </h1>
-          <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Multi-Step Verification active</p>
+          <p className="text-gray-400 text-[10px] uppercase tracking-widest font-bold">Identity Verification active</p>
         </div>
 
         <div className="relative z-10 flex flex-col gap-2">
-          <div className="bg-white p-4 rounded-2xl w-full text-black shadow-xl border border-white">
+          <div className="bg-white p-4 rounded-2xl w-full text-black shadow-xl border border-gray-100">
             <span className="text-[8px] font-black mb-1 block uppercase">Step 01</span>
             <p className="text-[10px] font-bold leading-tight tracking-tight">Create your secure account</p>
           </div>
           <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl w-full text-white/40">
-            <span className="text-[8px] font-black mb-1 block uppercase tracking-tighter opacity-50">Next Steps</span>
-            <p className="text-[10px] font-bold leading-tight opacity-50">Consent & Biometric Scan</p>
+            <span className="text-[8px] font-black mb-1 block uppercase tracking-tighter">Next Steps</span>
+            <p className="text-[10px] font-bold leading-tight">Consent & Biometric Scan</p>
           </div>
         </div>
       </div>
 
-      {/* RIGHT SIDE: Registry Form */}
-      <div className="w-full lg:w-[70%] bg-black p-6 md:p-12 lg:p-16 flex flex-col items-center overflow-y-auto custom-scrollbar">
+      {/* RIGHT SIDE: White Registry Form */}
+      <div className="w-full lg:w-[70%] bg-white p-6 md:p-12 lg:p-16 flex flex-col items-center overflow-y-auto custom-scrollbar">
         <div className="max-w-2xl w-full">
-          <div className="mb-8">
-            <h2 className="text-2xl font-black tracking-tight mb-1">Sign Up Account</h2>
-            <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Personal Data Entry Terminal</p>
+          <div className="mb-8 text-center md:text-left">
+            <h2 className="text-3xl font-black tracking-tight mb-1 uppercase">Sign Up</h2>
+            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Personal Data Entry Terminal</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5 text-left">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-left">
             
             <div className={inputContainer}>
               <label className={labelClass}>First Name</label>
@@ -200,24 +191,24 @@ const Register = () => {
             <div className={inputContainer}>
               <label className={labelClass}>Password</label>
               <input type="password" placeholder="••••••••" required className={inputClass} 
-                value={formData.password} onChange={e => handleChange('password', e.target.value)} />
+                value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
 
             <div className={inputContainer}>
               <label className={labelClass}>Confirm Password</label>
               <input type="password" placeholder="••••••••" required className={inputClass} 
-                value={formData.confirmPassword} onChange={e => handleChange('confirmPassword', e.target.value)} />
+                value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
             </div>
 
-            <div className="md:col-span-2 pt-4">
-              <button type="submit" className="w-full bg-white text-black hover:bg-green-600 hover:text-white transition-all font-black py-3 rounded-lg text-xs shadow-xl active:scale-[0.98]">
+            <div className="md:col-span-2 pt-6">
+              <button type="submit" className="w-full bg-black hover:bg-[#008751] text-white transition-all duration-300 font-black py-4 rounded-xl text-xs uppercase tracking-[0.2em] shadow-xl active:scale-[0.98]">
                 REGISTER & CONTINUE
               </button>
               
-              <div className="mt-4 text-center">
-                <p className="text-gray-600 text-[10px] font-medium">
+              <div className="mt-6 text-center">
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">
                   Already have an account? {' '}
-                  <Link to="/login" className="text-white font-bold hover:text-green-500 underline underline-offset-4 decoration-green-500/20">
+                  <Link to="/login" className="text-black font-black hover:text-[#008751] underline underline-offset-8 decoration-[#008751]/20 transition-all ml-1">
                     Log in
                   </Link>
                 </p>
@@ -230,9 +221,9 @@ const Register = () => {
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #22c55e; }
-        select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1em; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #008751; }
+        select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1em; }
       `}</style>
     </div>
   );
