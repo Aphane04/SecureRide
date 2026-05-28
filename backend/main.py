@@ -296,16 +296,54 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
     return [{"id": t.id, "passenger_email": e if e else "Purged User", "pickup_location": t.pickup_location, "destination": t.destination, "fare": t.fare, "status": t.status, "start_time": t.start_time} for t, e in rows]
 
 @app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
-def admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); logs = db.query(models.AiSafetyLog).all(); res = []
+def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    
+    # Fetch logs
+    logs = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all()
+    
+    result = []
     for log in logs:
+        # 1. Fetch Trip safely
         trip = db.query(models.Trip).filter(models.Trip.id == log.trip_id).first()
-        if not trip: continue
-        p_u = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
-        d_u = db.query(models.User).filter(models.User.id == trip.driver_id).first()
-        contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == trip.passenger_id).all()
-        res.append({"id": log.id, "transcript": log.transcript, "detected_at": log.detected_at, "trip": {"id": trip.id, "pickup": trip.pickup_location, "destination": trip.destination, "status": trip.status}, "passenger": {"name": p_u.profile.full_name if p_u and p_u.profile else "Unknown", "phone": p_u.profile.phone if p_u and p_u.profile else "N/A", "contacts": [{"name": c.name, "phone": c.phone} for c in contacts]}, "driver": {"name": d_u.profile.full_name if d_u and d_u.profile else "Not Assigned", "phone": d_u.profile.phone if d_u and d_u.profile else "N/A"}})
-    return res
+        if not trip:
+            continue
+
+        # 2. Fetch Passenger safely
+        p_user = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
+        p_profile = p_user.profile if p_user else None
+        
+        # 3. Fetch Contacts safely
+        p_contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == trip.passenger_id).all()
+        
+        # 4. Fetch Driver safely
+        d_user = db.query(models.User).filter(models.User.id == trip.driver_id).first() if trip.driver_id else None
+        d_profile = d_user.profile if d_user else None
+
+        # 5. Build the object with fallbacks to prevent crashes
+        result.append({
+            "id": log.id,
+            "transcript": log.transcript,
+            "detected_at": log.detected_at,
+            "is_resolved": getattr(log, 'is_resolved', False), # Logic added previously
+            "trip": {
+                "id": trip.id,
+                "pickup": trip.pickup_location,
+                "destination": trip.destination,
+                "status": trip.status
+            },
+            "passenger": {
+                "name": p_profile.full_name if p_profile else "Deleted User",
+                "phone": p_profile.phone if p_profile else "N/A",
+                "contacts": [{"name": c.name, "phone": c.phone} for c in p_contacts]
+            },
+            "driver": {
+                "name": d_profile.full_name if d_profile else "Not Assigned",
+                "phone": d_profile.phone if d_profile else "N/A"
+            }
+        })
+        
+    return result
 
 @app.get("/admin/notifications")
 def admin_notifs(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
