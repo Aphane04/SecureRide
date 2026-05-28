@@ -14,6 +14,9 @@ from dotenv import load_dotenv
 
 from database import engine, Base, get_db
 import models, schemas
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 
@@ -370,3 +373,75 @@ def resolve_alert(alert_id: int, user: models.User = Depends(get_current_user), 
     if not log: raise HTTPException(status_code=404)
     log.is_resolved = True; db.commit()
     return {"message": "Incident resolved"}
+
+# --- Helper: The Email Dispatch Engine ---
+def send_emergency_email(trip_id, transcript, passenger_name, driver_name):
+    recipient = os.getenv("TRACKING_COMPANY_EMAIL")
+    sender = os.getenv("SMTP_USER")
+    password = os.getenv("SMTP_PASSWORD")
+
+    subject = f"[URGENT] SecureRide Safety Breach - Trip #{trip_id}"
+    body = f"""
+    SECURE-RIDE SAFETY BUREAU: INCIDENT REPORT
+    ------------------------------------------
+    CASE REFERENCE: #SR-ALERT-{trip_id}
+    TIMESTAMP: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
+    
+    01. AI EVIDENCE TRANSCRIPT
+    --------------------------
+    "{transcript}"
+    
+    02. TARGET IDENTIFICATION
+    --------------------------
+    PASSENGER: {passenger_name}
+    OPERATOR (DRIVER): {driver_name}
+    
+    03. MISSION LOGISTICS
+    --------------------------
+    Trip Reference ID: {trip_id}
+    Live tracking available at: https://secure-ride-zeta.vercel.app/dashboard/admin/alerts
+    
+    Status: AI-Triggered Emergency. Please dispatch nearest unit to GPS coordinates.
+    ------------------------------------------
+    """
+
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = recipient
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP(os.getenv("SMTP_SERVER"), int(os.getenv("SMTP_PORT")))
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, recipient, msg.as_string())
+        server.quit()
+        print(f"Emergency report dispatched to tracking company: {recipient}")
+    except Exception as e:
+        print(f"Email system failure: {str(e)}")
+
+# --- Updated Emergency Endpoint ---
+@app.post("/trips/{trip_id}/emergency")
+def trigger_ai_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
+    # 1. Log the alert in our local database
+    new_log = models.AiSafetyLog(trip_id=trip_id, transcript=data.transcript)
+    db.add(new_log)
+    
+    # 2. Gather names for the tracking company report
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    p_name = "Unknown Passenger"
+    d_name = "Unassigned Driver"
+    
+    if trip:
+        p_user = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
+        d_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
+        if p_user and p_user.profile: p_name = p_user.profile.full_name
+        if d_user and d_user.profile: d_name = d_user.profile.full_name
+
+    db.commit()
+
+    # 3. DISPATCH EMAIL TO SIZOKUTHOLA TRACKINGS
+    send_emergency_email(trip_id, data.transcript, p_name, d_name)
+
+    return {"status": "alert_dispatched"}
