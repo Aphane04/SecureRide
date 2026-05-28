@@ -1,8 +1,6 @@
-import os, uuid, hashlib, base64, smtplib
+import os, uuid, hashlib, base64
 from datetime import datetime, timedelta
 from typing import List
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,10 +14,13 @@ from dotenv import load_dotenv
 
 from database import engine, Base, get_db
 import models, schemas
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "secureride_terminal_secret_999")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "secureride_secret_777_terminal")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
@@ -72,7 +73,6 @@ def ensure_admin(user: models.User):
     if user.role != "Admin": raise HTTPException(status_code=403, detail="Admin access required")
 
 def perform_deep_purge(user_id: int, db: Session):
-    # Purge order to handle foreign key constraints
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user: return
     trip_ids = [t.id for t in db.query(models.Trip).filter(or_(models.Trip.passenger_id == user_id, models.Trip.driver_id == user_id)).all()]
@@ -86,34 +86,8 @@ def perform_deep_purge(user_id: int, db: Session):
     db.query(models.Profile).filter(models.Profile.user_id == user_id).delete(synchronize_session=False)
     db.delete(user)
 
-def send_emergency_email(trip_id, transcript, passenger_name, driver_name):
-    recipient = os.getenv("TRACKING_COMPANY_EMAIL")
-    sender = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASSWORD")
-    if not all([recipient, sender, password]): return
-
-    subject = f"[URGENT] SecureRide Safety Breach - Trip #{trip_id}"
-    body = f"""
-    SECURE-RIDE SAFETY BUREAU: INCIDENT REPORT
-    ------------------------------------------
-    CASE REFERENCE: #SR-ALERT-{trip_id}
-    01. AI EVIDENCE TRANSCRIPT: "{transcript}"
-    02. PASSENGER: {passenger_name}
-    03. DRIVER: {driver_name}
-    Live tracking: https://secure-ride-zeta.vercel.app/dashboard/admin/alerts
-    ------------------------------------------
-    """
-    msg = MIMEMultipart()
-    msg['From'], msg['To'], msg['Subject'] = sender, recipient, subject
-    msg.attach(MIMEText(body, 'plain'))
-    try:
-        server = smtplib.SMTP(os.getenv("SMTP_SERVER", "smtp.gmail.com"), 587)
-        server.starttls(); server.login(sender, password)
-        server.sendmail(sender, recipient, msg.as_string()); server.quit()
-    except Exception as e: print(f"Email failure: {e}")
-
 # ==========================================
-# ENDPOINTS
+# AUTHENTICATION & PROFILE
 # ==========================================
 
 @app.post("/auth/register", response_model=schemas.UserOut)
@@ -126,7 +100,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if user.role == "Passenger": db.add(models.Passenger(user_id=new_user.id))
     elif user.role == "Driver": db.add(models.Driver(user_id=new_user.id))
     elif user.role == "Admin": db.add(models.Admin(user_id=new_user.id))
-    db.commit(); return new_user
+    db.commit()
+    return new_user
 
 @app.post("/auth/login")
 def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
@@ -151,6 +126,7 @@ def get_me(user: models.User = Depends(get_current_user)):
 @app.put("/auth/users/me", response_model=schemas.UserProfileOut)
 def update_profile(data: schemas.ProfileUpdate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile
+    if not p: raise HTTPException(404, "Profile not found")
     if data.full_name: p.full_name = data.full_name
     if data.phone: p.phone = data.phone
     if data.address: p.physical_address = data.address
@@ -162,7 +138,8 @@ def update_profile(data: schemas.ProfileUpdate, user: models.User = Depends(get_
 @app.delete("/auth/users/me")
 def delete_me(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     perform_deep_purge(user.id, db)
-    db.commit(); return {"message": "Purged"}
+    db.commit()
+    return {"message": "Purged"}
 
 @app.post("/auth/consent/{user_id}")
 def record_consent(user_id: int): return {"status": "recorded"}
@@ -180,7 +157,10 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
     if user: user.is_verified = True; db.commit()
     return {"status": "ok"}
 
-# --- Trips ---
+# ==========================================
+# TRIPS & LIVE MOTION TRACKING
+# ==========================================
+
 @app.post("/trips/estimate", response_model=schemas.TripEstimateResponse)
 def estimate_trip(data: schemas.TripEstimateRequest):
     base, km, min = 20.0, 12.0, 2.5
@@ -206,59 +186,94 @@ def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db:
 
 @app.get("/trips/active", response_model=schemas.TripOut)
 def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    trip = db.query(models.Trip).filter(or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id), models.Trip.status.in_(["Active", "Searching", "Canceled", "Completed"])).order_by(models.Trip.start_time.desc()).first()
+    trip = db.query(models.Trip).filter(
+        or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id),
+        models.Trip.status.in_(["Active", "Searching", "Canceled", "Completed"])
+    ).order_by(models.Trip.start_time.desc()).first()
+
     if not trip: raise HTTPException(404)
+
     if trip.status == "Active" and trip.driver_id:
-        d_u = db.query(models.User).filter(models.User.id == trip.driver_id).first()
-        v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
-        trip.driver_name = d_u.profile.full_name if (d_u and d_u.profile) else "Pilot"
-        if v: trip.vehicle_model, trip.vehicle_plate = v.make_model, v.plate_number
+        driver_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
+        vehicle = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
+        trip.driver_name = driver_user.profile.full_name if (driver_user and driver_user.profile) else "Authorized Pilot"
+        if vehicle:
+            trip.vehicle_model = vehicle.make_model
+            trip.vehicle_plate = vehicle.plate_number
     return trip
 
 @app.patch("/trips/{trip_id}/location")
 def update_trip_location(trip_id: int, lat: float = Form(...), lng: float = Form(...), db: Session = Depends(get_db)):
     trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if trip: trip.current_lat, trip.current_lng = lat, lng; db.commit()
-    return {"status": "ok"}
+    if trip:
+        trip.current_lat = lat
+        trip.current_lng = lng
+        db.commit()
+    return {"status": "updated"}
 
 @app.post("/trips/{trip_id}/complete")
 def complete_trip(trip_id: int, db: Session = Depends(get_db)):
     trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if trip: trip.status = "Completed"; db.commit()
-    return {"status": "ok"}
+    if trip:
+        trip.status = "Completed"
+        db.commit()
+    return {"status": "completed"}
 
 @app.post("/trips/{trip_id}/cancel")
-def cancel_trip(trip_id: int):
+def cancel_trip(trip_id: int, db: Session = Depends(get_db)):
     trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if trip: trip.status = "Canceled"; db.commit(); return {"status": "ok"}
-    raise HTTPException(404)
+    if trip: trip.status = "Canceled"; db.commit()
+    return {"status": "ok"}
 
 @app.get("/trips/history", response_model=List[schemas.TripOut])
 def get_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    f = models.Trip.passenger_id == user.id if user.role == "Passenger" else models.Trip.driver_id == user.id
-    return db.query(models.Trip).filter(f).order_by(models.Trip.start_time.desc()).all()
+    role_filter = models.Trip.passenger_id == user.id if user.role == "Passenger" else models.Trip.driver_id == user.id
+    return db.query(models.Trip).filter(role_filter).order_by(models.Trip.start_time.desc()).all()
 
-# --- Emergency ---
+@app.get("/trips/driver-history", response_model=List[schemas.TripOut])
+def get_driver_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Trip).filter(models.Trip.driver_id == user.id).order_by(models.Trip.start_time.desc()).all()
+
+# ==========================================
+# EMERGENCY & CONTACTS
+# ==========================================
+
+@app.post("/contacts", response_model=schemas.EmergencyContactOut)
+def add_contact(contact: schemas.EmergencyContactCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    new_c = models.EmergencyContact(user_id=user.id, name=contact.name, phone=contact.phone, relationship_type=contact.relationship_type)
+    db.add(new_c); db.commit(); db.refresh(new_c); return new_c
+
+@app.get("/contacts", response_model=List[schemas.EmergencyContactOut])
+def list_contacts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == user.id).all()
+
 @app.post("/trips/{trip_id}/emergency")
-def trigger_ai_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
+def trigger_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
     db.add(models.AiSafetyLog(trip_id=trip_id, transcript=data.transcript)); db.commit()
-    t = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    p_n, d_n = "Unknown", "Unassigned"
-    if t:
-        p = db.query(models.User).filter(models.User.id == t.passenger_id).first()
-        d = db.query(models.User).filter(models.User.id == t.driver_id).first()
-        if p and p.profile: p_n = p.profile.full_name
-        if d and d.profile: d_n = d.profile.full_name
-    send_emergency_email(trip_id, data.transcript, p_n, d_n)
-    return {"status": "dispatched"}
+    return {"status": "ok"}
+
+# ==========================================
+# VEHICLE REGISTRATION (Fixed Base64 logic)
+# ==========================================
 
 @app.post("/vehicles/register", response_model=schemas.VehicleOut)
 def register_vehicle(make_model: str = Form(...), plate_number: str = Form(...), photo: UploadFile = File(None), user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    p_uri = f"data:{photo.content_type};base64,{base64.b64encode(photo.file.read()).decode('utf-8')}" if photo else None
-    v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=p_uri)
-    db.add(v); db.commit(); db.refresh(v); return v
+    if user.role != "Driver": raise HTTPException(403)
+    
+    photo_uri = None
+    if photo:
+        # FIX: Read file bytes into 'content' variable before encoding
+        content = photo.file.read()
+        photo_uri = f"data:{photo.content_type};base64,{base64.b64encode(content).decode('utf-8')}"
+    
+    vehicle = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=photo_uri)
+    db.add(vehicle); db.commit(); db.refresh(vehicle)
+    return vehicle
 
-# --- Admin ---
+# ==========================================
+# ADMIN INTELLIGENCE
+# ==========================================
+
 @app.get("/admin/overview", response_model=schemas.AdminOverviewOut)
 def admin_overview(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
@@ -266,13 +281,14 @@ def admin_overview(user: models.User = Depends(get_current_user), db: Session = 
 
 @app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
 def admin_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); u_list = db.query(models.User).filter(models.User.role == "Passenger").all()
-    return [{"id": u.id, "email": u.email, "is_verified": u.is_verified, "role": u.role, "full_name": u.profile.full_name if u.profile else "N/A", "phone": u.profile.phone if u.profile else "N/A", "id_number": u.profile.id_number if u.profile else "N/A", "address": u.profile.physical_address if u.profile else "N/A", "dob": u.profile.dob if u.profile else "N/A", "gender": u.profile.gender if u.profile else "N/A", "ethnicity": u.profile.ethnicity if u.profile else "N/A", "id_photo_url": u.profile.id_photo_url if u.profile else None, "created_at": u.created_at} for u in u_list]
+    ensure_admin(user); users = db.query(models.User).filter(models.User.role == "Passenger").all()
+    return [{"id": u.id, "email": u.email, "is_verified": u.is_verified, "role": u.role, "full_name": u.profile.full_name if u.profile else "N/A", "phone": u.profile.phone if u.profile else "N/A", "id_number": u.profile.id_number if u.profile else "N/A", "address": u.profile.physical_address if u.profile else "N/A", "dob": u.profile.dob if u.profile else "N/A", "gender": u.profile.gender if u.profile else "N/A", "ethnicity": u.profile.ethnicity if u.profile else "N/A", "id_photo_url": u.profile.id_photo_url if u.profile else None, "created_at": u.created_at} for u in users]
 
 @app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
 def admin_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); u_list = db.query(models.User).filter(models.User.role == "Driver").all(); res = []
-    for u in u_list:
+    ensure_admin(user); users = db.query(models.User).filter(models.User.role == "Driver").all()
+    res = []
+    for u in users:
         v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == u.id).first()
         res.append({"id": u.id, "email": u.email, "is_verified": u.is_verified, "role": u.role, "full_name": u.profile.full_name if u.profile else "N/A", "phone": u.profile.phone if u.profile else "N/A", "id_number": u.profile.id_number if u.profile else "N/A", "address": u.profile.physical_address if u.profile else "N/A", "dob": u.profile.dob if u.profile else "N/A", "gender": u.profile.gender if u.profile else "N/A", "ethnicity": u.profile.ethnicity if u.profile else "N/A", "id_photo_url": u.profile.id_photo_url if u.profile else None, "vehicle": v, "created_at": u.created_at})
     return res
@@ -280,25 +296,63 @@ def admin_drivers(user: models.User = Depends(get_current_user), db: Session = D
 @app.get("/admin/trips", response_model=List[schemas.AdminTripOut])
 def admin_trips(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user); rows = db.query(models.Trip, models.User.email).outerjoin(models.User, models.Trip.passenger_id == models.User.id).all()
-    return [{"id": t.id, "passenger_email": e if e else "Purged", "pickup_location": t.pickup_location, "destination": t.destination, "fare": t.fare, "status": t.status, "start_time": t.start_time} for t, e in rows]
+    return [{"id": t.id, "passenger_email": e if e else "Purged User", "pickup_location": t.pickup_location, "destination": t.destination, "fare": t.fare, "status": t.status, "start_time": t.start_time} for t, e in rows]
 
 @app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
-def admin_get_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); logs = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all(); res = []
+def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    
+    # Fetch logs
+    logs = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all()
+    
+    result = []
     for log in logs:
-        t = db.query(models.Trip).filter(models.Trip.id == log.trip_id).first()
-        if not t: continue
-        p_u = db.query(models.User).filter(models.User.id == t.passenger_id).first()
-        d_u = db.query(models.User).filter(models.User.id == t.driver_id).first()
-        contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == t.passenger_id).all()
-        res.append({"id": log.id, "transcript": log.transcript, "detected_at": log.detected_at, "is_resolved": getattr(log, 'is_resolved', False), "trip": {"id": t.id, "pickup": t.pickup_location, "destination": t.destination, "status": t.status}, "passenger": {"name": p_u.profile.full_name if (p_u and p_u.profile) else "Unknown", "phone": p_u.profile.phone if (p_u and p_u.profile) else "N/A", "contacts": [{"name": c.name, "phone": c.phone} for c in contacts]}, "driver": {"name": d_u.profile.full_name if (d_u and d_u.profile) else "Not Assigned", "phone": d_u.profile.phone if (d_u and d_u.profile) else "N/A"}})
-    return res
+        # 1. Fetch Trip safely
+        trip = db.query(models.Trip).filter(models.Trip.id == log.trip_id).first()
+        if not trip:
+            continue
+
+        # 2. Fetch Passenger safely
+        p_user = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
+        p_profile = p_user.profile if p_user else None
+        
+        # 3. Fetch Contacts safely
+        p_contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == trip.passenger_id).all()
+        
+        # 4. Fetch Driver safely
+        d_user = db.query(models.User).filter(models.User.id == trip.driver_id).first() if trip.driver_id else None
+        d_profile = d_user.profile if d_user else None
+
+        # 5. Build the object with fallbacks to prevent crashes
+        result.append({
+            "id": log.id,
+            "transcript": log.transcript,
+            "detected_at": log.detected_at,
+            "is_resolved": getattr(log, 'is_resolved', False), # Logic added previously
+            "trip": {
+                "id": trip.id,
+                "pickup": trip.pickup_location,
+                "destination": trip.destination,
+                "status": trip.status
+            },
+            "passenger": {
+                "name": p_profile.full_name if p_profile else "Deleted User",
+                "phone": p_profile.phone if p_profile else "N/A",
+                "contacts": [{"name": c.name, "phone": c.phone} for c in p_contacts]
+            },
+            "driver": {
+                "name": d_profile.full_name if d_profile else "Not Assigned",
+                "phone": d_profile.phone if d_profile else "N/A"
+            }
+        })
+        
+    return result
 
 @app.get("/admin/notifications")
-def admin_notifications(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def admin_notifs(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user); yesterday = datetime.utcnow() - timedelta(hours=24); users = db.query(models.User).filter(models.User.created_at >= yesterday).all(); alerts = db.query(models.AiSafetyLog).filter(models.AiSafetyLog.detected_at >= yesterday).all(); res = []
-    for u in users: res.append({"id": f"u-{u.id}", "type": "REG", "message": f"New {u.role}: {u.email}", "time": u.created_at.isoformat() + "Z"})
-    for a in alerts: res.append({"id": f"a-{a.id}", "type": "SAFETY_ALERT", "message": f"AI ALERT: Trip #{a.trip_id}", "time": a.detected_at.isoformat() + "Z"})
+    for u in users: res.append({"id": f"u-{u.id}", "type": "REG", "message": f"New {u.role} registered: {u.email}", "time": u.created_at.isoformat() + "Z"})
+    for a in alerts: res.append({"id": f"a-{a.id}", "type": "SAFETY_ALERT", "message": f"AI ALERT: Trip #{a.trip_id} - '{a.transcript}'", "time": a.detected_at.isoformat() + "Z"})
     return sorted(res, key=lambda x: x['time'], reverse=True)
 
 @app.get("/admin/users", response_model=List[schemas.AdminUserOut])
@@ -307,19 +361,87 @@ def admin_all_users(user: models.User = Depends(get_current_user), db: Session =
     return [{"id": u.id, "email": u.email, "role": u.role, "is_verified": u.is_verified, "full_name": u.profile.full_name if u.profile else "N/A", "gender": u.profile.gender if u.profile else "N/A", "created_at": u.created_at} for u in users]
 
 @app.post("/admin/users/bulk-delete")
-def admin_bulk_delete(data: List[int], user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def bulk_delete(data: List[int], user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
     for uid in [i for i in data if i != user.id]: perform_deep_purge(uid, db)
     db.commit(); return {"status": "ok"}
 
 @app.patch("/admin/alerts/{alert_id}/resolve")
-def admin_resolve_alert(alert_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); log = db.query(models.AiSafetyLog).filter(models.AiSafetyLog.id == alert_id).first()
-    if log: log.is_resolved = True; db.commit(); return {"status": "ok"}
-    raise HTTPException(404)
+def resolve_alert(alert_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    log = db.query(models.AiSafetyLog).filter(models.AiSafetyLog.id == alert_id).first()
+    if not log: raise HTTPException(status_code=404)
+    log.is_resolved = True; db.commit()
+    return {"message": "Incident resolved"}
 
-@app.post("/contacts", response_model=schemas.EmergencyContactOut)
-def admin_add_contact(contact: schemas.EmergencyContactCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if user.role not in ["Driver", "Passenger"]: raise HTTPException(403)
-    new_c = models.EmergencyContact(user_id=user.id, name=contact.name, phone=contact.phone, relationship_type=contact.relationship_type)
-    db.add(new_c); db.commit(); db.refresh(new_c); return new_c
+# --- Helper: The Email Dispatch Engine ---
+def send_emergency_email(trip_id, transcript, passenger_name, driver_name):
+    recipient = os.getenv("TRACKING_COMPANY_EMAIL")
+    sender = os.getenv("SMTP_USER")
+    password = os.getenv("SMTP_PASSWORD")
+
+    subject = f"[URGENT] SecureRide Safety Breach - Trip #{trip_id}"
+    body = f"""
+    SECURE-RIDE SAFETY BUREAU: INCIDENT REPORT
+    ------------------------------------------
+    CASE REFERENCE: #SR-ALERT-{trip_id}
+    TIMESTAMP: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
+    
+    01. AI EVIDENCE TRANSCRIPT
+    --------------------------
+    "{transcript}"
+    
+    02. TARGET IDENTIFICATION
+    --------------------------
+    PASSENGER: {passenger_name}
+    OPERATOR (DRIVER): {driver_name}
+    
+    03. MISSION LOGISTICS
+    --------------------------
+    Trip Reference ID: {trip_id}
+    Live tracking available at: https://secure-ride-zeta.vercel.app/dashboard/admin/alerts
+    
+    Status: AI-Triggered Emergency. Please dispatch nearest unit to GPS coordinates.
+    ------------------------------------------
+    """
+
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = recipient
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP(os.getenv("SMTP_SERVER"), int(os.getenv("SMTP_PORT")))
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, recipient, msg.as_string())
+        server.quit()
+        print(f"Emergency report dispatched to tracking company: {recipient}")
+    except Exception as e:
+        print(f"Email system failure: {str(e)}")
+
+# --- Updated Emergency Endpoint ---
+@app.post("/trips/{trip_id}/emergency")
+def trigger_ai_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depends(get_db)):
+    # 1. Log the alert in our local database
+    new_log = models.AiSafetyLog(trip_id=trip_id, transcript=data.transcript)
+    db.add(new_log)
+    
+    # 2. Gather names for the tracking company report
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    p_name = "Unknown Passenger"
+    d_name = "Unassigned Driver"
+    
+    if trip:
+        p_user = db.query(models.User).filter(models.User.id == trip.passenger_id).first()
+        d_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
+        if p_user and p_user.profile: p_name = p_user.profile.full_name
+        if d_user and d_user.profile: d_name = d_user.profile.full_name
+
+    db.commit()
+
+    # 3. DISPATCH EMAIL TO SIZOKUTHOLA TRACKINGS
+    send_emergency_email(trip_id, data.transcript, p_name, d_name)
+
+    return {"status": "alert_dispatched"}
