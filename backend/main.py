@@ -1,6 +1,7 @@
 import os, uuid, hashlib, base64
 from datetime import datetime, timedelta
 from typing import List
+
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -27,6 +28,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 app = FastAPI(title="SecureRide API")
 
+# --- CORS Configuration ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -188,7 +190,6 @@ def get_active(user: models.User = Depends(get_current_user), db: Session = Depe
 
     if not trip: raise HTTPException(404)
 
-    # Attach driver/vehicle info if trip is active
     if trip.status == "Active" and trip.driver_id:
         driver_user = db.query(models.User).filter(models.User.id == trip.driver_id).first()
         vehicle = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
@@ -196,7 +197,6 @@ def get_active(user: models.User = Depends(get_current_user), db: Session = Depe
         if vehicle:
             trip.vehicle_model = vehicle.make_model
             trip.vehicle_plate = vehicle.plate_number
-
     return trip
 
 @app.patch("/trips/{trip_id}/location")
@@ -227,7 +227,14 @@ def get_history(user: models.User = Depends(get_current_user), db: Session = Dep
     role_filter = models.Trip.passenger_id == user.id if user.role == "Passenger" else models.Trip.driver_id == user.id
     return db.query(models.Trip).filter(role_filter).order_by(models.Trip.start_time.desc()).all()
 
-# --- Safety & Admin ---
+@app.get("/trips/driver-history", response_model=List[schemas.TripOut])
+def get_driver_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Trip).filter(models.Trip.driver_id == user.id).order_by(models.Trip.start_time.desc()).all()
+
+# ==========================================
+# EMERGENCY & CONTACTS
+# ==========================================
+
 @app.post("/contacts", response_model=schemas.EmergencyContactOut)
 def add_contact(contact: schemas.EmergencyContactCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     new_c = models.EmergencyContact(user_id=user.id, name=contact.name, phone=contact.phone, relationship_type=contact.relationship_type)
@@ -242,12 +249,27 @@ def trigger_emergency(trip_id: int, data: schemas.EmergencyAlert, db: Session = 
     db.add(models.AiSafetyLog(trip_id=trip_id, transcript=data.transcript)); db.commit()
     return {"status": "ok"}
 
+# ==========================================
+# VEHICLE REGISTRATION (Fixed Base64 logic)
+# ==========================================
+
 @app.post("/vehicles/register", response_model=schemas.VehicleOut)
 def register_vehicle(make_model: str = Form(...), plate_number: str = Form(...), photo: UploadFile = File(None), user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role != "Driver": raise HTTPException(403)
-    photo_uri = f"data:{photo.content_type};base64,{base64.b64encode(content).decode('utf-8')}" if photo else None
-    v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=photo_uri)
-    db.add(v); db.commit(); db.refresh(v); return v
+    
+    photo_uri = None
+    if photo:
+        # FIX: Read file bytes into 'content' variable before encoding
+        content = photo.file.read()
+        photo_uri = f"data:{photo.content_type};base64,{base64.b64encode(content).decode('utf-8')}"
+    
+    vehicle = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=photo_uri)
+    db.add(vehicle); db.commit(); db.refresh(vehicle)
+    return vehicle
+
+# ==========================================
+# ADMIN INTELLIGENCE
+# ==========================================
 
 @app.get("/admin/overview", response_model=schemas.AdminOverviewOut)
 def admin_overview(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
