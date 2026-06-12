@@ -9,16 +9,9 @@ class User(Base):
     email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False)
-    is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    profile = relationship("Profile", back_populates="user", uselist=False)
-    passenger = relationship("Passenger", back_populates="user", uselist=False)
-    driver = relationship("Driver", back_populates="user", uselist=False)
-    emergency_contacts = relationship("EmergencyContact", back_populates="user")
-
-class Profile(Base):
-    __tablename__ = "profile"
-    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    
+    # Merged Profile fields
     full_name = Column(String(255))
     id_number = Column(String(50))
     dob = Column(String(50))
@@ -26,13 +19,19 @@ class Profile(Base):
     ethnicity = Column(String(50))
     phone = Column(String(20))
     physical_address = Column(String(255))
-    id_photo_url = Column(Text, nullable=True) 
-    user = relationship("User", back_populates="profile")
+
+    # Relationships
+    passenger = relationship("Passenger", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    driver = relationship("Driver", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    admin = relationship("Admin", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    emergency_contacts = relationship("EmergencyContact", back_populates="user", cascade="all, delete-orphan")
 
 class Passenger(Base):
     __tablename__ = "passenger"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     loyalty_points = Column(Integer, default=0)
+    id_photo_url = Column(Text, nullable=True) 
+    is_verified = Column(Boolean, default=False)
     user = relationship("User", back_populates="passenger")
 
 class Driver(Base):
@@ -40,15 +39,21 @@ class Driver(Base):
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     license_number = Column(String(100))
     verification_status = Column(String(50), default="Pending")
+    id_photo_url = Column(Text, nullable=True)
+    is_verified = Column(Boolean, default=False)
+    
     user = relationship("User", back_populates="driver")
+    vehicles = relationship("Vehicle", back_populates="driver", cascade="all, delete-orphan")
+    tracking_companies = relationship("TrackingCompany", back_populates="driver", cascade="all, delete-orphan")
 
 class Vehicle(Base):
     __tablename__ = "vehicle"
     id = Column(Integer, primary_key=True, index=True)
-    driver_id = Column(Integer, ForeignKey("user.id"))
+    driver_id = Column(Integer, ForeignKey("driver.user_id"))
     make_model = Column(String(100))
     plate_number = Column(String(20))
-    photo_url = Column(Text, nullable=True) 
+    photo_url = Column(Text, nullable=True)
+    driver = relationship("Driver", back_populates="vehicles")
 
 class EmergencyContact(Base):
     __tablename__ = "emergency_contact"
@@ -56,7 +61,6 @@ class EmergencyContact(Base):
     user_id = Column(Integer, ForeignKey("user.id"))
     name = Column(String(100))
     phone = Column(String(20))
-    relationship_type = Column(String(50))
     user = relationship("User", back_populates="emergency_contacts")
 
 class Trip(Base):
@@ -72,6 +76,8 @@ class Trip(Base):
     payment_method = Column(String(20), default="Cash")
     status = Column(String(50), default="Searching")
     start_time = Column(DateTime(timezone=True), server_default=func.now())
+    current_lat = Column(Float, nullable=True)
+    current_lng = Column(Float, nullable=True)
 
 class AiSafetyLog(Base):
     __tablename__ = "ai_safety_log"
@@ -83,4 +89,14 @@ class AiSafetyLog(Base):
 
 class Admin(Base):
     __tablename__ = "admin"
-    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    admin_level = Column(String(50), default="Standard")
+    user = relationship("User", back_populates="admin")
+
+class TrackingCompany(Base):
+    __tablename__ = "tracking_company"
+    id = Column(Integer, primary_key=True, index=True)
+    driver_id = Column(Integer, ForeignKey("driver.user_id"))
+    reg_no = Column(String(100))
+    company_name = Column(String(100))
+    driver = relationship("Driver", back_populates="tracking_companies")
