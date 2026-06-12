@@ -316,3 +316,32 @@ def admin_trips(user: models.User = Depends(get_current_user), db: Session = Dep
         "status": t.status or "Unknown",
         "start_time": t.start_time
     } for t, e in rows]
+
+    # Update this endpoint in main.py
+
+@app.get("/admin/users", response_model=List[schemas.AdminUserOut])
+def get_all_system_users(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    users = db.query(models.User).all()
+    
+    res = []
+    for u in users:
+        # Determine verification status based on the role
+        verified = False
+        if u.role == "Passenger" and u.passenger:
+            verified = u.passenger.is_verified
+        elif u.role == "Driver" and u.driver:
+            verified = u.driver.is_verified
+        elif u.role == "Admin":
+            verified = True
+
+        res.append({
+            "id": u.id, 
+            "email": u.email, 
+            "role": u.role, 
+            "is_verified": verified,
+            "full_name": u.full_name if u.full_name else "Incomplete Profile",
+            "gender": u.gender if u.gender else "N/A",
+            "created_at": u.created_at
+        })
+    return res
