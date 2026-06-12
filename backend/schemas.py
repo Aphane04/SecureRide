@@ -36,6 +36,7 @@ class UserProfileOut(BaseModel):
     gender: Optional[str]
     id_number: Optional[str]
     is_verified: bool
+    has_vehicle: bool
     class Config:
         from_attributes = True
 
