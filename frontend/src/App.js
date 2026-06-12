@@ -28,6 +28,7 @@ import AdminDrivers from './pages/dashboard/AdminDrivers';
 import AdminPassengers from './pages/dashboard/AdminPassengers';
 import AdminAlerts from './pages/dashboard/AdminAlerts';
 import AdminSettings from './pages/dashboard/AdminSettings';
+import AuthError from './pages/AuthError';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/auth/error" element={<AuthError />} />
 
         <Route path="/verify/consent" element={<Consent />} />
         <Route path="/verify/id-upload" element={<IDUpload />} />

@@ -12,25 +12,44 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const response = await authAPI.login({ email, password });
-      const { access_token, user } = response.data;
+  // Inside Login.js, update the handleSubmit function:
 
-      login(user, access_token);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  try {
+    const response = await authAPI.login({ email, password });
+    const { access_token, user } = response.data;
+    login(user, access_token);
 
-      // Redirect based on role
-      if (user.role === 'Admin') navigate('/dashboard/admin');
-      else if (user.role === 'Driver') navigate('/dashboard/driver');
-      else navigate('/dashboard/passenger/ride');
-    } catch (error) {
-      alert(error.response?.data?.detail || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
+    if (user.role === 'Admin') navigate('/dashboard/admin');
+    else if (user.role === 'Driver') navigate('/dashboard/driver');
+    else navigate('/dashboard/passenger/ride');
+
+  } catch (error) {
+    const status = error.response?.status;
+    const detail = error.response?.data?.detail || "";
+
+    let errorData = {
+      message: "The credentials provided do not match our secure records.",
+      type: "incorrect_details"
+    };
+
+    // Logic: If user is not found at all (404) or specifically "User not found"
+    if (status === 404 || detail.toLowerCase().includes("not found")) {
+      errorData = {
+        message: "No account is currently registered under this identity.",
+        type: "no_account"
+      };
     }
-  };
+
+    // Redirect to the new error page instead of alerting
+    navigate('/auth/error', { state: errorData });
+
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Professional White Theme Styles
   const inputContainer = "flex flex-col gap-1.5";
