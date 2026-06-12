@@ -28,7 +28,7 @@ import AdminDrivers from './pages/dashboard/AdminDrivers';
 import AdminPassengers from './pages/dashboard/AdminPassengers';
 import AdminAlerts from './pages/dashboard/AdminAlerts';
 import AdminSettings from './pages/dashboard/AdminSettings';
-import AuthError from './pages/AuthError';
+import AuthError from './pages/auth/AuthError';
 
 function App() {
   return (
