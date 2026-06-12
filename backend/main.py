@@ -27,7 +27,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 app = FastAPI(title="SecureRide API - v3")
 
-# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -94,7 +93,6 @@ def send_emergency_email(trip_id, transcript, passenger_name, driver_name):
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email registered")
-
     new_user = models.User(
         email=user.email, password=get_password_hash(user.password), role=user.role,
         full_name=user.full_name, id_number=user.id_number, phone=user.phone,
@@ -111,14 +109,11 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == credentials.email).first()
     if not user or not verify_password(credentials.password, user.password):
         raise HTTPException(status_code=400, detail="Incorrect credentials")
-
     is_verified = True
     if user.role == "Passenger": is_verified = user.passenger.is_verified if user.passenger else False
     elif user.role == "Driver": is_verified = user.driver.is_verified if user.driver else False
-    
     if not is_verified and user.role != "Admin":
         raise HTTPException(status_code=403, detail="Biometric verification required.")
-
     token = create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer", "user": {"id": user.id, "role": user.role}}
 
@@ -130,6 +125,7 @@ def get_me(user: models.User = Depends(get_current_user), db: Session = Depends(
         is_v = user.passenger.is_verified if user.passenger else False
     elif user.role == "Driver":
         is_v = user.driver.is_verified if user.driver else False
+        # Registry Check: Does this driver have a vehicle?
         veh = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
         has_v = True if veh else False
     
@@ -151,6 +147,9 @@ def delete_me(user: models.User = Depends(get_current_user), db: Session = Depen
     perform_deep_purge(user.id, db); db.commit()
     return {"status": "purged"}
 
+@app.post("/auth/consent/{user_id}")
+def record_consent(user_id: int): return {"status": "ok"}
+
 @app.post("/auth/upload-id/{user_id}")
 def upload_id(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
     content = f"data:{file.content_type};base64,{base64.b64encode(file.file.read()).decode('utf-8')}"
@@ -169,11 +168,12 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
     db.commit(); return {"status": "ok"}
 
 # ==========================================
-# TRIPS & HISTORY
+# TRIPS & FARE CALCULATION
 # ==========================================
 
 @app.post("/trips/estimate", response_model=schemas.TripEstimateResponse)
 def estimate_trip(data: schemas.TripEstimateRequest):
+    # R20 Base + R12/km + R2.5/min
     base, km_rate, min_rate = 20.0, 12.0, 2.5
     est = round(base + (data.distance_km * km_rate) + (data.duration_minutes * min_rate), 2)
     return {"estimated_fare": est, "payment_method": "Cash"}
@@ -183,21 +183,23 @@ def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_
     trip = models.Trip(passenger_id=user.id, pickup_location=data.pickup_location, destination=data.destination, distance_km=data.distance_km, duration_minutes=data.duration_minutes, fare=data.fare, status="Searching")
     db.add(trip); db.commit(); db.refresh(trip); return trip
 
-@app.get("/trips/history", response_model=List[schemas.TripOut])
-def history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.Trip).filter(models.Trip.passenger_id == user.id).order_by(models.Trip.start_time.desc()).all()
-
-@app.get("/trips/driver-history", response_model=List[schemas.TripOut])
-def drv_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.Trip).filter(models.Trip.driver_id == user.id).order_by(models.Trip.start_time.desc()).all()
-
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def get_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role != "Driver": raise HTTPException(403)
+    # SECURITY: Ensure driver has a vehicle registered
+    veh = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
+    if not veh: raise HTTPException(status_code=403, detail="Vehicle registry required to see requests.")
+    
     limit = datetime.utcnow() - timedelta(minutes=15)
     return db.query(models.Trip).filter(models.Trip.status == "Searching", models.Trip.driver_id == None, models.Trip.start_time >= limit).all()
 
 @app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
 def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role != "Driver": raise HTTPException(403)
+    # SECURITY: Ensure driver has a vehicle registered
+    veh = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
+    if not veh: raise HTTPException(status_code=403, detail="Vehicle registry required to accept missions.")
+
     trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
     if not trip or trip.driver_id: raise HTTPException(404)
     trip.driver_id, trip.status = user.id, "Active"
@@ -210,7 +212,7 @@ def get_active(user: models.User = Depends(get_current_user), db: Session = Depe
     if trip.status == "Active" and trip.driver_id:
         d = db.query(models.User).filter(models.User.id == trip.driver_id).first()
         v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
-        trip.driver_name = d.full_name if d else "Pilot"
+        trip.driver_name = d.full_name
         if v: trip.vehicle_model, trip.vehicle_plate = v.make_model, v.plate_number
     return trip
 
@@ -220,33 +222,36 @@ def update_loc(trip_id: int, lat: float = Form(...), lng: float = Form(...), db:
     if trip: trip.current_lat, trip.current_lng = lat, lng; db.commit()
     return {"ok": True}
 
-@app.post("/trips/{trip_id}/complete")
-def finish_trip(trip_id: int, db: Session = Depends(get_db)):
-    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if trip: trip.status = "Completed"; db.commit(); return {"ok": True}
-
-@app.post("/trips/{trip_id}/cancel")
-def cancel_trip(trip_id: int, db: Session = Depends(get_db)):
-    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if trip: trip.status = "Canceled"; db.commit(); return {"ok": True}
-
 # ==========================================
-# EMERGENCY CONTACTS
+# CONTACTS & VEHICLES
 # ==========================================
-
-@app.get("/contacts", response_model=List[schemas.EmergencyContactOut])
-def list_contacts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == user.id).all()
 
 @app.post("/contacts", response_model=schemas.EmergencyContactOut)
 def add_contact(contact: schemas.EmergencyContactCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     new_c = models.EmergencyContact(user_id=user.id, name=contact.name, phone=contact.phone)
     db.add(new_c); db.commit(); db.refresh(new_c); return new_c
 
-@app.delete("/contacts/{cid}")
-def del_contact(cid: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    db.query(models.EmergencyContact).filter(models.EmergencyContact.id == cid, models.EmergencyContact.user_id == user.id).delete()
-    db.commit(); return {"ok": True}
+@app.get("/contacts", response_model=List[schemas.EmergencyContactOut])
+def list_contacts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == user.id).all()
+
+@app.post("/vehicles/register", response_model=schemas.VehicleOut)
+def reg_vehicle(make_model: str = Form(...), plate_number: str = Form(...), photo: UploadFile = File(None), user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role != "Driver": raise HTTPException(403)
+    p_uri = None
+    if photo:
+        p_uri = f"data:{photo.content_type};base64,{base64.b64encode(photo.file.read()).decode('utf-8')}"
+    
+    # Logic: Registry occurs only once. If exists, update details.
+    v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
+    if v:
+        v.make_model, v.plate_number = make_model, plate_number
+        if p_uri: v.photo_url = p_uri
+    else:
+        v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=p_uri)
+        db.add(v)
+    
+    db.commit(); db.refresh(v); return v
 
 # ==========================================
 # ADMIN & EMERGENCY
@@ -260,21 +265,6 @@ def trigger_alert(trip_id: int, data: schemas.EmergencyAlert, db: Session = Depe
     d = db.query(models.User).get(t.driver_id) if t.driver_id else None
     send_emergency_email(trip_id, data.transcript, p.full_name if p else "N/A", d.full_name if d else "N/A")
     return {"ok": True}
-
-@app.post("/vehicles/register", response_model=schemas.VehicleOut)
-def reg_vehicle(make_model: str = Form(...), plate_number: str = Form(...), photo: UploadFile = File(None), user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if user.role != "Driver": raise HTTPException(403)
-    p_uri = None
-    if photo:
-        p_uri = f"data:{photo.content_type};base64,{base64.b64encode(photo.file.read()).decode('utf-8')}"
-    v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
-    if v:
-        v.make_model, v.plate_number = make_model, plate_number
-        if p_uri: v.photo_url = p_uri
-    else:
-        v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=p_uri)
-        db.add(v)
-    db.commit(); db.refresh(v); return v
 
 @app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
 def admin_p(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -291,20 +281,38 @@ def admin_d(user: models.User = Depends(get_current_user), db: Session = Depends
     for u in u_list:
         v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == u.id).first()
         res.append({
-            "id": u.id, "email": u.email, "is_verified": u.driver.is_verified if u.driver else False, "role": u.role,
+            "id": u.id, "email": u.email, "is_verified": u.driver.is_verified, "role": u.role,
             "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address,
-            "id_photo_url": u.driver.id_photo_url if u.driver else None, "vehicle": v, "created_at": u.created_at
+            "id_photo_url": u.driver.id_photo_url, "vehicle": v, "created_at": u.created_at
         })
     return res
 
-@app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
-def admin_get_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); logs = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).all(); res = []
-    for log in logs:
-        t = db.query(models.Trip).filter(models.Trip.id == log.trip_id).first()
-        if not t: continue
-        p_u = db.query(models.User).filter(models.User.id == t.passenger_id).first()
-        d_u = db.query(models.User).filter(models.User.id == t.driver_id).first()
-        contacts = db.query(models.EmergencyContact).filter(models.EmergencyContact.user_id == t.passenger_id).all()
-        res.append({"id": log.id, "transcript": log.transcript, "detected_at": log.detected_at, "is_resolved": getattr(log, 'is_resolved', False), "trip": {"id": t.id, "pickup": t.pickup_location, "destination": t.destination, "status": t.status}, "passenger": {"name": p_u.full_name if p_u else "Unknown", "phone": p_u.phone if p_u else "N/A", "contacts": [{"name": c.name, "phone": c.phone} for c in contacts]}, "driver": {"name": d_u.full_name if d_u else "Not Assigned", "phone": d_u.phone if d_u else "N/A"}})
-    return res
+# --- Update these in main.py ---
+
+@app.get("/admin/overview", response_model=schemas.AdminOverviewOut)
+def admin_overview(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    return {
+        "drivers": db.query(models.User).filter(models.User.role == "Driver").count(),
+        "passengers": db.query(models.User).filter(models.User.role == "Passenger").count(),
+        "active_trips": db.query(models.Trip).filter(models.Trip.status == "Active").count(),
+        "safety_alerts": db.query(models.AiSafetyLog).count()
+    }
+
+@app.get("/admin/trips", response_model=List[schemas.AdminTripOut])
+def admin_trips(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    # Use outerjoin to ensure trips show even if the user was deleted
+    rows = db.query(models.Trip, models.User.email).outerjoin(
+        models.User, models.Trip.passenger_id == models.User.id
+    ).order_by(models.Trip.start_time.desc()).all()
+    
+    return [{
+        "id": t.id,
+        "passenger_email": e if e else "Unknown User",
+        "pickup_location": t.pickup_location or "N/A",
+        "destination": t.destination or "N/A",
+        "fare": t.fare or 0.0,
+        "status": t.status or "Unknown",
+        "start_time": t.start_time
+    } for t, e in rows]
