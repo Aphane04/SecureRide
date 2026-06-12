@@ -13,11 +13,14 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // 1. Password Match Validation
     if (formData.password !== formData.confirmPassword) {
       return alert("Passwords do not match");
     }
 
     try {
+      // 2. Attempt Registration
       const response = await authAPI.register({
         email: formData.email,
         password: formData.password,
@@ -31,14 +34,32 @@ const Register = () => {
         ethnicity: formData.ethnicity
       });
 
+      // 3. Success Redirection Logic
       if (formData.accountType === "Admin") {
         alert("Admin account created successfully.");
         navigate('/login');
       } else {
         navigate('/verify/consent', { state: { userId: response.data.id } });
       }
+
     } catch (error) {
-      alert(error.response?.data?.detail || "Registration failed. Please try again.");
+      // ==========================================
+      // EXCEPTION HANDLING: Email already exists
+      // ==========================================
+      const detail = error.response?.data?.detail || "";
+
+      if (detail.toLowerCase().includes("email registered") || error.response?.status === 400) {
+        // Redirect to the specific Exception Page
+        navigate('/register/error', { 
+          state: { 
+            message: "This email address is already registered within our safety network. Please sign in to your existing account." 
+          } 
+        });
+      } else {
+        // Handle other general server errors
+        alert(detail || "Registration failed. Please check your connection and try again.");
+      }
+      // ==========================================
     }
   };
 
@@ -71,7 +92,7 @@ const Register = () => {
   return (
     <div className="flex h-screen bg-white text-black font-sans overflow-hidden">
       
-      {/* LEFT SIDE: Identity Panel (30% width) */}
+      {/* LEFT SIDE: Identity Panel */}
       <div className="hidden lg:flex lg:w-[30%] relative flex-col justify-between p-10 overflow-hidden border-r border-gray-100">
         <img 
           src={sideImage} 
@@ -106,7 +127,7 @@ const Register = () => {
         </div>
       </div>
 
-      {/* RIGHT SIDE: White Registry Form (70% width) */}
+      {/* RIGHT SIDE: White Registry Form */}
       <div className="w-full lg:w-[70%] bg-white p-6 md:p-12 lg:p-16 flex flex-col items-center overflow-y-auto custom-scrollbar">
         <div className="max-w-2xl w-full">
           <div className="mb-8 text-center md:text-left">
