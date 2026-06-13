@@ -53,7 +53,7 @@ const PassengerRide = () => {
 
   const { dangerDetected } = useAiMonitor(activeTripId);
 
-  // 1. RECOVERY: Check for active trip when component loads
+  // 1. RECOVERY: Restore session on refresh
   useEffect(() => {
     const recoverSession = async () => {
       try {
@@ -143,7 +143,7 @@ const PassengerRide = () => {
     } catch (err) { console.error(err); }
   };
 
-  // 2. POLLING: Watch for Driver acceptance, Motion, or Cancellation
+  // 2. POLLING: Detect Driver, Motion, Cancellation, or Completion
   useEffect(() => {
     if (!activeTripId) return;
 
@@ -151,7 +151,7 @@ const PassengerRide = () => {
       try {
         const res = await tripAPI.getActiveTrip();
         if (res.data) {
-          // Detect Driver Cancellation
+          // Detect Cancellation
           if (res.data.status === 'Canceled') {
             if (alertedTripId.current !== res.data.id) {
               alertedTripId.current = res.data.id;
@@ -161,19 +161,19 @@ const PassengerRide = () => {
             return;
           }
 
-          // Detect Completion
+          // Detect Completion (Passenger Notification)
           if (res.data.status === 'Completed') {
-              alert("Mission Accomplished: You have reached your destination.");
+              alert("MISSION ACCOMPLISHED: You have reached your destination safely.");
               resetUI();
               return;
           }
 
-          // Update Motion Tracking
+          // Update Motion Tracking (Moving the car icon)
           if (res.data.current_lat && res.data.current_lng) {
               setDriverPos({ lat: res.data.current_lat, lng: res.data.current_lng });
           }
 
-          // Set Active Details
+          // Set Active Details (Triggers driver info card)
           if (res.data.status === 'Active') {
             setActiveTripDetails(res.data);
             setBookingMessage('DRIVER MATCHED!');
@@ -189,7 +189,7 @@ const PassengerRide = () => {
     return () => clearInterval(timer);
   }, [activeTripId]);
 
-  // 3. MAP SYNC: Draw route when details are matched
+  // 3. MAP SYNC
   useEffect(() => {
     if (!activeTripDetails || !window.google) return;
     const service = new window.google.maps.DirectionsService();
@@ -212,12 +212,12 @@ const PassengerRide = () => {
           {directionsResponse && <DirectionsRenderer directions={directionsResponse} options={{ polylineOptions: { strokeColor: '#008751', strokeWeight: 6 } }} />}
           {!directionsResponse && <MarkerF position={center} />}
           
-          {/* LIVE DRIVER MARKER */}
+          {/* LIVE DRIVER MOTION MARKER */}
           {driverPos && (
               <MarkerF 
                 position={driverPos} 
                 icon={{
-                    url: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png", // CAR ICON
+                    url: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png",
                     scaledSize: new window.google.maps.Size(40, 40)
                 }}
               />
@@ -284,7 +284,7 @@ const PassengerRide = () => {
             </div>
           )}
 
-          {/* DYNAMIC SEARCHING / MATCHED STATUS BOX */}
+          {/* DYNAMIC STATUS: SEARCHING OR DRIVER INFORMATION */}
           {activeTripId && (
             <div className="mb-8 p-8 border border-gray-100 rounded-[2.5rem] bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-700 text-black">
                {activeTripDetails ? (
@@ -295,18 +295,31 @@ const PassengerRide = () => {
                     <h3 className="text-xl font-black uppercase tracking-tight mb-8">Driver Dispatched</h3>
                     
                     <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* DRIVER PROFILE CARD WITH IMAGE */}
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 flex items-center gap-5 shadow-sm">
-                            <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center text-white"><User size={20} /></div>
+                            <div className="w-16 h-16 bg-black rounded-full overflow-hidden border-2 border-[#008751] shadow-lg flex-shrink-0">
+                                {activeTripDetails.driver_photo_url ? (
+                                    <img src={activeTripDetails.driver_photo_url} className="w-full h-full object-cover" alt="Driver" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-white"><User size={24} /></div>
+                                )}
+                            </div>
                             <div>
                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Assigned Pilot</p>
                                 <p className="text-sm font-black text-black">{activeTripDetails.driver_name || 'Verified Driver'}</p>
+                                <span className="text-[8px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-black uppercase mt-1 inline-block">Identity Verified</span>
                             </div>
                         </div>
+
+                        {/* VEHICLE ASSET CARD */}
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 flex items-center gap-5 shadow-sm">
                             <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-[#008751]"><Car size={20} /></div>
                             <div>
                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Secure Vehicle</p>
-                                <p className="text-sm font-black text-black uppercase">{activeTripDetails.vehicle_model || 'Security Unit'} • <span className="text-[#008751]">{activeTripDetails.vehicle_plate || '---'}</span></p>
+                                <p className="text-sm font-black text-black uppercase leading-tight">
+                                    {activeTripDetails.vehicle_model} <br/> 
+                                    <span className="text-[#008751]">{activeTripDetails.vehicle_plate}</span>
+                                </p>
                             </div>
                         </div>
                     </div>

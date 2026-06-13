@@ -138,14 +138,22 @@ class TripOut(BaseModel):
     destination: str
     status: str
     start_time: datetime
+    distance_km: float # Added to ensure full data return
+    duration_minutes: float # Added to ensure full data return
     fare: float
     passenger_id: Optional[int] = None
     driver_id: Optional[int] = None
+    
+    # Information displayed to the passenger once matched
     driver_name: Optional[str] = None
+    driver_photo_url: Optional[str] = None  # ADDED: This will hold the Base64 face image
     vehicle_model: Optional[str] = None
     vehicle_plate: Optional[str] = None
+    
+    # Motion tracking coordinates
     current_lat: Optional[float] = None
     current_lng: Optional[float] = None
+
     class Config:
         from_attributes = True
 

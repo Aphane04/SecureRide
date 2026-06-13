@@ -60,7 +60,9 @@ export const contactAPI = {
 
 export const vehicleAPI = {
   registerVehicle: (formData) =>
-    api.post('/vehicles/register', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    api.post('/vehicles/register', formData, { 
+        headers: { 'Content-Type': 'multipart/form-data' } 
+    }),
 };
 
 export const adminAPI = {
