@@ -59,6 +59,7 @@ class EmergencyContact(Base):
     user_id = Column(Integer, ForeignKey("user.id"))
     name = Column(String(100))
     phone = Column(String(20))
+    relationship_type = Column(String(50), nullable=True) 
     user = relationship("User", back_populates="emergency_contacts")
 
 class Trip(Base):
