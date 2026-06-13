@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
+# --- Auth ---
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -17,6 +18,12 @@ class UserCreate(BaseModel):
     role: str
     ethnicity: Optional[str] = None
     password: str
+
+    @field_validator('password')
+    def password_length_bcrypt(cls, v):
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password cannot be longer than 72 bytes')
+        return v
 
 class UserOut(BaseModel):
     id: int
@@ -36,10 +43,11 @@ class UserProfileOut(BaseModel):
     gender: Optional[str]
     id_number: Optional[str]
     is_verified: bool
-    has_vehicle: bool
+    has_vehicle: bool = False
     class Config:
         from_attributes = True
 
+# --- Details ---
 class VehicleOut(BaseModel):
     id: int
     make_model: str
@@ -60,6 +68,7 @@ class AlertUserDetail(BaseModel):
     email: Optional[str] = None
     contacts: List[dict] = []
 
+# --- Admin ---
 class AdminUserOut(BaseModel):
     id: int
     email: str
@@ -103,18 +112,21 @@ class AdminAlertOut(BaseModel):
     class Config:
         from_attributes = True
 
+# --- Contacts (THE FIX IS HERE) ---
 class EmergencyContactCreate(BaseModel):
     name: str
     phone: str
-    relationship_type: Optional[str] = None
+    relationship_type: Optional[str] = None # Added this to stop the crash
+
 class EmergencyContactOut(BaseModel):
     id: int
     name: str
     phone: str
-    relationship_type: Optional[str] = None 
+    relationship_type: Optional[str] = None
     class Config:
         from_attributes = True
 
+# --- Trips ---
 class EmergencyAlert(BaseModel):
     transcript: str
 
@@ -139,22 +151,15 @@ class TripOut(BaseModel):
     destination: str
     status: str
     start_time: datetime
-    distance_km: float # Added to ensure full data return
-    duration_minutes: float # Added to ensure full data return
     fare: float
     passenger_id: Optional[int] = None
     driver_id: Optional[int] = None
-    
-    # Information displayed to the passenger once matched
     driver_name: Optional[str] = None
-    driver_photo_url: Optional[str] = None  # ADDED: This will hold the Base64 face image
+    driver_photo_url: Optional[str] = None
     vehicle_model: Optional[str] = None
     vehicle_plate: Optional[str] = None
-    
-    # Motion tracking coordinates
     current_lat: Optional[float] = None
     current_lng: Optional[float] = None
-
     class Config:
         from_attributes = True
 
