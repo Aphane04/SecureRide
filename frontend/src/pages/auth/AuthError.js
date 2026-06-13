@@ -56,12 +56,12 @@ const AuthError = () => {
           )}
 
           {/* Secondary Action */}
-          <button 
-            onClick={() => navigate('/')}
-            className="text-[#008751] font-black text-[10px] uppercase tracking-widest hover:underline mt-8 flex items-center justify-center gap-2 mx-auto"
-          >
-            Terminal Home <ArrowRight size={12} />
-          </button>
+          <Link 
+          to="/register"
+          className="..."
+>
+          Click here to register <ArrowRight size={12} />
+          </Link>
         </div>
 
         {/* Footer Branding */}
