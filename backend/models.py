@@ -41,10 +41,8 @@ class Driver(Base):
     verification_status = Column(String(50), default="Pending")
     id_photo_url = Column(Text, nullable=True)
     is_verified = Column(Boolean, default=False)
-    
     user = relationship("User", back_populates="driver")
     vehicles = relationship("Vehicle", back_populates="driver", cascade="all, delete-orphan")
-    tracking_companies = relationship("TrackingCompany", back_populates="driver", cascade="all, delete-orphan")
 
 class Vehicle(Base):
     __tablename__ = "vehicle"
@@ -89,14 +87,6 @@ class AiSafetyLog(Base):
 
 class Admin(Base):
     __tablename__ = "admin"
-    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
     admin_level = Column(String(50), default="Standard")
     user = relationship("User", back_populates="admin")
-
-class TrackingCompany(Base):
-    __tablename__ = "tracking_company"
-    id = Column(Integer, primary_key=True, index=True)
-    driver_id = Column(Integer, ForeignKey("driver.user_id"))
-    reg_no = Column(String(100))
-    company_name = Column(String(100))
-    driver = relationship("Driver", back_populates="tracking_companies")
