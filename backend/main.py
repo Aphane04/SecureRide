@@ -247,13 +247,46 @@ def list_contacts(user: models.User = Depends(get_current_user), db: Session = D
 @app.post("/contacts", response_model=schemas.EmergencyContactOut)
 def add_contact(contact: schemas.EmergencyContactCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role not in ["Driver", "Passenger"]: raise HTTPException(403)
-    new_c = models.EmergencyContact(user_id=user.id, name=contact.name, phone=contact.phone)
-    db.add(new_c); db.commit(); db.refresh(new_c); return new_c
+    
+    # Ensure relationship_type is included here
+    new_c = models.EmergencyContact(
+        user_id=user.id, 
+        name=contact.name, 
+        phone=contact.phone,
+        relationship_type=contact.relationship_type 
+    )
+    db.add(new_c)
+    db.commit()
+    db.refresh(new_c)
+    return new_c
+
+@app.put("/contacts/{cid}", response_model=schemas.EmergencyContactOut)
+def update_contact(cid: int, contact: schemas.EmergencyContactCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    existing = db.query(models.EmergencyContact).filter(
+        models.EmergencyContact.id == cid, 
+        models.EmergencyContact.user_id == user.id
+    ).first()
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    # Update all fields
+    existing.name = contact.name
+    existing.phone = contact.phone
+    existing.relationship_type = contact.relationship_type
+    
+    db.commit()
+    db.refresh(existing)
+    return existing
 
 @app.delete("/contacts/{cid}")
 def del_contact(cid: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    db.query(models.EmergencyContact).filter(models.EmergencyContact.id == cid, models.EmergencyContact.user_id == user.id).delete()
-    db.commit(); return {"ok": True}
+    db.query(models.EmergencyContact).filter(
+        models.EmergencyContact.id == cid, 
+        models.EmergencyContact.user_id == user.id
+    ).delete()
+    db.commit()
+    return {"status": "ok"}
 
 # ==========================================
 # ASSETS & AI MONITOR

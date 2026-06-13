@@ -111,6 +111,7 @@ class EmergencyContactOut(BaseModel):
     id: int
     name: str
     phone: str
+    relationship_type: Optional[str] = None 
     class Config:
         from_attributes = True
 
