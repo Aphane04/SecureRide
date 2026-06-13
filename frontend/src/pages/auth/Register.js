@@ -14,13 +14,26 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // 1. Password Match Validation
+    // 1. Basic match check
     if (formData.password !== formData.confirmPassword) {
       return alert("Passwords do not match");
     }
 
+    // 2. Strong Password Validation (Frontend check to prevent 400 error)
+    const password = formData.password;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const digitCount = (password.match(/\d/g) || []).length;
+
+    if (password.length < 8 || !hasUpper || !hasSpecial || digitCount < 3) {
+      return alert(
+        "Security Requirement: Password must be at least 8 characters long, " +
+        "contain 1 uppercase letter, 1 special character, and at least 3 digits."
+      );
+    }
+
     try {
-      // 2. Attempt Registration
+      // 3. Attempt Registration
       const response = await authAPI.register({
         email: formData.email,
         password: formData.password,
@@ -34,7 +47,6 @@ const Register = () => {
         ethnicity: formData.ethnicity
       });
 
-      // 3. Success Redirection Logic
       if (formData.accountType === "Admin") {
         alert("Admin account created successfully.");
         navigate('/login');
@@ -43,30 +55,25 @@ const Register = () => {
       }
 
     } catch (error) {
-      // ==========================================
-      // EXCEPTION HANDLING: Email already exists
-      // ==========================================
       const detail = error.response?.data?.detail || "";
 
-      if (detail.toLowerCase().includes("email registered") || error.response?.status === 400) {
-        // Redirect to the specific Exception Page
+      // 4. Handle specific Backend exceptions
+      if (detail.toLowerCase().includes("email registered") || detail.toLowerCase().includes("already registered")) {
         navigate('/register/error', { 
           state: { 
             message: "This email address is already registered within our safety network. Please sign in to your existing account." 
           } 
         });
       } else {
-        // Handle other general server errors
-        alert(detail || "Registration failed. Please check your connection and try again.");
+        // This catches the backend's own password strength error if the frontend check fails
+        alert(detail || "Registration failed. Please check your data and try again.");
       }
-      // ==========================================
     }
   };
 
   const handleChange = (field, value) => {
     let updatedData = { ...formData, [field]: value };
 
-    // ID Parsing Logic (South African ID Format)
     if (field === 'idNumber' && value.length === 13) {
       const idStr = value;
       const yy = idStr.substring(0, 2);
@@ -84,7 +91,6 @@ const Register = () => {
     setFormData(updatedData);
   };
 
-  // Modern White Theme Styles
   const inputContainer = "flex flex-col gap-1";
   const labelClass = "text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold ml-1";
   const inputClass = "w-full bg-gray-100 border border-gray-200 text-black p-2.5 rounded-lg focus:border-[#008751] focus:bg-white outline-none transition-all text-xs placeholder:text-gray-400 font-medium appearance-none";
@@ -92,12 +98,11 @@ const Register = () => {
   return (
     <div className="flex h-screen bg-white text-black font-sans overflow-hidden">
       
-      {/* LEFT SIDE: Identity Panel */}
       <div className="hidden lg:flex lg:w-[30%] relative flex-col justify-between p-10 overflow-hidden border-r border-gray-100">
         <img 
           src={sideImage} 
           alt="SecureRide" 
-          className="absolute inset-0 w-full h-full object-cover brightness-[0.4] grayscale-[20%]" 
+          className="absolute inset-0 w-full h-full object-cover brightness-[0.4]" 
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
 
@@ -118,16 +123,15 @@ const Register = () => {
         <div className="relative z-10 flex flex-col gap-2">
           <div className="bg-white p-4 rounded-2xl w-full text-black shadow-xl border border-gray-100">
             <span className="text-[8px] font-black mb-1 block uppercase">Step 01</span>
-            <p className="text-[10px] font-bold leading-tight tracking-tight">Create your secure account</p>
+            <p className="text-[10px] font-bold leading-tight tracking-tight text-black">Create your secure account</p>
           </div>
           <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl w-full text-white/40">
             <span className="text-[8px] font-black mb-1 block uppercase tracking-tighter">Next Steps</span>
-            <p className="text-[10px] font-bold leading-tight">Consent & Biometric Scan</p>
+            <p className="text-[10px] font-bold leading-tight text-white/40">Consent & Biometric Scan</p>
           </div>
         </div>
       </div>
 
-      {/* RIGHT SIDE: White Registry Form */}
       <div className="w-full lg:w-[70%] bg-white p-6 md:p-12 lg:p-16 flex flex-col items-center overflow-y-auto custom-scrollbar">
         <div className="max-w-2xl w-full">
           <div className="mb-8 text-center md:text-left">
@@ -213,13 +217,13 @@ const Register = () => {
             <div className={inputContainer}>
               <label className={labelClass}>Password</label>
               <input type="password" placeholder="••••••••" required className={inputClass} 
-                value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                value={formData.password} onChange={e => handleChange('password', e.target.value)} />
             </div>
 
             <div className={inputContainer}>
               <label className={labelClass}>Confirm Password</label>
               <input type="password" placeholder="••••••••" required className={inputClass} 
-                value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
+                value={formData.confirmPassword} onChange={e => handleChange('confirmPassword', e.target.value)} />
             </div>
 
             <div className="md:col-span-2 pt-6">
