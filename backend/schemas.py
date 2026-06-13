@@ -106,7 +106,7 @@ class AdminAlertOut(BaseModel):
 class EmergencyContactCreate(BaseModel):
     name: str
     phone: str
-
+    relationship_type: Optional[str] = None
 class EmergencyContactOut(BaseModel):
     id: int
     name: str
