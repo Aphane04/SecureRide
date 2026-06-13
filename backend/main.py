@@ -389,3 +389,9 @@ def bulk_delete_users(data: List[int], user: models.User = Depends(get_current_u
     db.query(models.User).filter(models.User.id.in_(ids)).delete(synchronize_session=False)
     db.commit()
     return {"status": "ok"}
+
+@app.delete("/auth/users/me")
+def delete_account(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    perform_deep_purge(user.id, db)
+    db.commit()
+    return {"status": "ok", "message": "Account and all associated data have been permanently deleted"}
