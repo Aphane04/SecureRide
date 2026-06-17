@@ -1,6 +1,6 @@
 import os, uuid, hashlib, base64, smtplib, re
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -252,18 +252,52 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
 # TRIPS & MISSIONS
 # ==========================================
 
+# 1. FIXED: Added estimate route that returns 'estimated_fare' for the frontend
+@app.post("/trips/estimate")
+def estimate_fare(data: schemas.TripCreate):
+    # Logic: R15.00 base + R12.00 per kilometer
+    distance = data.distance_km if data.distance_km else 0
+    calculated_fare = 15.0 + (distance * 12.0)
+    return {"estimated_fare": round(calculated_fare, 2)}
+
+# 2. FIXED: Active trip polling - Moved ABOVE {trip_id} and returns null on empty
+@app.get("/trips/active", response_model=Optional[schemas.TripOut])
+def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    trip = db.query(models.Trip).filter(
+        or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id),
+        models.Trip.status.in_(["Active", "Searching"])
+    ).order_by(models.Trip.start_time.desc()).first()
+
+    if not trip: 
+        return None # Prevents 404 console errors during frontend polling
+
+    if trip.driver_id:
+        d = db.query(models.User).filter(models.User.id == trip.driver_id).first()
+        v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
+        if d: 
+            trip.driver_name = d.full_name
+            # Pull photo from driver profile
+            d_profile = db.query(models.Driver).filter(models.Driver.user_id == d.id).first()
+            trip.driver_photo_url = d_profile.id_photo_url if d_profile else None
+        if v: 
+            trip.vehicle_model = v.make_model
+            trip.vehicle_plate = v.plate_number
+            
+    return trip
+
 @app.post("/trips/book", response_model=schemas.TripOut)
 def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # FIX: Fare Calculation (Base rate 15 + 12 per KM)
-    calculated_fare = 15.0 + (data.distance_km * 12.0)
+    # FIX: Ensure fare is calculated correctly on backend
+    dist = data.distance_km if data.distance_km else 0
+    calculated_fare = 15.0 + (dist * 12.0)
     
     trip = models.Trip(
         passenger_id=user.id, 
         pickup_location=data.pickup_location, 
         destination=data.destination, 
-        distance_km=data.distance_km, 
+        distance_km=dist, 
         duration_minutes=data.duration_minutes, 
-        fare=round(calculated_fare, 2), # Use calculated fare
+        fare=round(calculated_fare, 2),
         status="Searching"
     )
     db.add(trip)
@@ -274,18 +308,14 @@ def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def get_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role != "Driver": raise HTTPException(403)
-    # Check if driver is verified and has vehicle
-    driver = db.query(models.Driver).filter(models.Driver.user_id == user.id).first()
     veh = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
-    
-    if not veh or not driver or not driver.is_verified:
-        raise HTTPException(403, "Verification and Vehicle registration required.")
+    if not veh: raise HTTPException(403, "Verification and Vehicle registration required.")
     
     limit = datetime.utcnow() - timedelta(minutes=30)
     return db.query(models.Trip).filter(
         models.Trip.status == "Searching", 
         models.Trip.driver_id == None, 
-        models.Trip.created_at >= limit
+        models.Trip.start_time >= limit
     ).all()
 
 @app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
@@ -294,29 +324,25 @@ def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db:
     if not veh: raise HTTPException(403, "Register vehicle first.")
 
     trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
-    if not trip or trip.driver_id: raise HTTPException(404)
+    if not trip or trip.driver_id: raise HTTPException(404, detail="Trip unavailable")
     trip.driver_id, trip.status = user.id, "Active"
     db.commit(); return trip
 
-@app.get("/trips/active", response_model=schemas.TripOut)
-def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    trip = db.query(models.Trip).filter(
-        or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id),
-        models.Trip.status.in_(["Active", "Searching"])
-    ).order_by(models.Trip.start_time.desc()).first()
+@app.post("/trips/{trip_id}/cancel")
+def cancel_trip(trip_id: int, db: Session = Depends(get_db)):
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    if trip:
+        trip.status = "Canceled"
+        db.commit()
+    return {"status": "ok"}
 
-    if not trip: 
-        raise HTTPException(404, detail="No active trip found")
-
-    if trip.driver_id:
-        d = db.query(models.User).filter(models.User.id == trip.driver_id).first()
-        v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
-        if d: trip.driver_name = d.full_name
-        if v: 
-            trip.vehicle_model = v.make_model
-            trip.vehicle_plate = v.plate_number
-            
-    return trip
+@app.post("/trips/{trip_id}/complete")
+def complete_trip(trip_id: int, db: Session = Depends(get_db)):
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    if trip:
+        trip.status = "Completed"
+        db.commit()
+    return {"status": "ok"}
 
 @app.get("/trips/history", response_model=List[schemas.TripOut])
 def get_passenger_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -392,55 +418,40 @@ def register_vehicle(
     if user.role != "Driver": 
         raise HTTPException(status_code=403, detail="Unauthorized: Only drivers can register vehicles.")
     
-    # 1. CRITICAL FIX: Ensure the driver record exists
-    # We need the actual Driver record, not just the User record
     driver_record = db.query(models.Driver).filter(models.Driver.user_id == user.id).first()
     if not driver_record:
-        # If for some reason the driver record is missing, create it now
         driver_record = models.Driver(user_id=user.id)
         db.add(driver_record)
-        db.flush() # This gets us an ID without committing yet
+        db.flush()
 
-    # 2. Handle Driver Face Photo (Biometrics)
     if driver_photo and driver_photo.filename:
         validate_image_type(driver_photo)
         b64_face = safe_file_to_base64(driver_photo, MAX_FILE_SIZE)
         driver_record.id_photo_url = f"data:{driver_photo.content_type};base64,{b64_face}"
 
-    # 3. Handle Vehicle Photo
     veh_uri = None
     if photo and photo.filename:
         validate_image_type(photo)
         b64_veh = safe_file_to_base64(photo, MAX_FILE_SIZE)
         veh_uri = f"data:{photo.content_type};base64,{b64_veh}"
 
-    # 4. Save or Update Vehicle
-    # Use driver_record.user_id to match your table's driver_id column
     v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
     
     try:
         if v:
-            v.make_model = make_model
-            v.plate_number = plate_number
-            if veh_uri: 
-                v.photo_url = veh_uri
+            v.make_model, v.plate_number = make_model, plate_number
+            if veh_uri: v.photo_url = veh_uri
         else:
-            v = models.Vehicle(
-                driver_id=user.id, 
-                make_model=make_model, 
-                plate_number=plate_number, 
-                photo_url=veh_uri
-            )
+            v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=veh_uri)
             db.add(v)
         
         db.commit()
         db.refresh(v)
         return v
-
     except Exception as e:
         db.rollback()
-        print(f"DATABASE ERROR: {str(e)}") # This will show the actual error in your terminal
         raise HTTPException(status_code=500, detail=f"Database sync failed: {str(e)}")
+
 # ==========================================
 # ADMIN & ALERTS
 # ==========================================
