@@ -84,20 +84,21 @@ def validate_document_type(file: UploadFile):
         )
 
 def safe_file_to_base64(file: UploadFile, max_size: int = MAX_FILE_SIZE) -> str:
-    """Safely read file and convert to base64 with validation"""
+    """Safely read file and convert to base64 with robust validation"""
     try:
-        # Validate size
-        validate_file_size(file, max_size)
-        
-        # Read file content
+        # Read file content safely
         file_content = file.file.read()
         
-        # Double-check file size after reading
+        # Validate size based on actual bytes read
         if len(file_content) > max_size:
+            size_mb = max_size / (1024 * 1024)
             raise HTTPException(
-                status_code=413,
-                detail=f"File too large after reading"
+                status_code=413, 
+                detail=f"File too large. Maximum size: {size_mb}MB"
             )
+            
+        if len(file_content) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
         
         # Convert to base64
         b64_content = base64.b64encode(file_content).decode('utf-8')

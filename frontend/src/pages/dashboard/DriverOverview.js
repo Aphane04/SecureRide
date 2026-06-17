@@ -140,24 +140,29 @@ const DriverOverview = () => {
   };
 
   const submitVehicle = async () => {
-    if (!driverFacePhoto) return alert("Please upload your facial image for biometric verification."); // Requirement check
-    try {
-      const formData = new FormData();
-      formData.append('make_model', vehicleForm.make_model);
-      formData.append('plate_number', vehicleForm.plate_number);
-      if (vehiclePhoto) formData.append('photo', vehiclePhoto);
-      if (driverFacePhoto) formData.append('driver_photo', driverFacePhoto); // Append the face image
-      
-      await vehicleAPI.registerVehicle(formData);
-      
-      setHasVehicle(true); 
-      setShowVehicleForm(false);
-      setVehicleForm({ make_model: '', plate_number: '' });
-      setVehiclePhoto(null);
-      setDriverFacePhoto(null); // Reset
-      alert('Vehicle Data and Biometrics Secured.');
-    } catch (err) { setUploadError('Registry sync failed. Check file size.'); }
-  };
+  if (!driverFacePhoto) return alert("Please upload your facial image for biometric verification.");
+  try {
+    setUploadError(''); // Clear previous errors
+    const formData = new FormData();
+    formData.append('make_model', vehicleForm.make_model);
+    formData.append('plate_number', vehicleForm.plate_number);
+    if (vehiclePhoto) formData.append('photo', vehiclePhoto);
+    if (driverFacePhoto) formData.append('driver_photo', driverFacePhoto);
+    
+    await vehicleAPI.registerVehicle(formData);
+    
+    setHasVehicle(true); 
+    setShowVehicleForm(false);
+    setVehicleForm({ make_model: '', plate_number: '' });
+    setVehiclePhoto(null);
+    setDriverFacePhoto(null);
+    alert('Vehicle Data and Biometrics Secured.');
+  } catch (err) { 
+    // Extract the actual backend error message if available
+    const backendError = err.response?.data?.detail || err.message || 'Registry sync failed.';
+    setUploadError(typeof backendError === 'string' ? backendError : JSON.stringify(backendError)); 
+  }
+};
 
   if (loadError) return <div className="p-10 text-red-500 font-bold text-center">Map Failure</div>;
   if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase animate-pulse">Initializing...</div>;
