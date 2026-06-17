@@ -20,7 +20,7 @@ const DriverOverview = () => {
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [vehicleForm, setVehicleForm] = useState({ make_model: '', plate_number: '' });
   const [vehiclePhoto, setVehiclePhoto] = useState(null);
-  const [driverFacePhoto, setDriverFacePhoto] = useState(null); // NEW: State for Driver Facial Image
+  const [driverFacePhoto, setDriverFacePhoto] = useState(null);
   const [uploadError, setUploadError] = useState('');
 
   const [rideRequests, setRideRequests] = useState([]);
@@ -98,7 +98,7 @@ const DriverOverview = () => {
   }, [isOnline]);
 
   useEffect(() => {
-    if (!activeTrip || !window.google || activeTrip.status === 'Canceled') {
+    if (!activeTrip || !window.google || activeTrip.status === 'Canceled' || activeTrip.status === 'Completed') {
       setDirections(null);
       return;
     }
@@ -139,41 +139,51 @@ const DriverOverview = () => {
     } catch (err) { alert("Finalization failed."); }
   };
 
- const submitVehicle = async () => {
-  if (!vehicleForm.make_model || !vehicleForm.plate_number) {
-    return alert("Please fill in vehicle details.");
-  }
-  if (!driverFacePhoto && !hasVehicle) {
-    return alert("Please upload your facial image for biometric verification.");
-  }
+  // FIXED: Added the missing handleCancelTrip function to prevent blank screen crash
+  const handleCancelTrip = async () => {
+    if (!activeTrip) return;
+    if (!window.confirm("Are you sure you want to cancel this mission?")) return;
+    try {
+      await tripAPI.cancelTrip(activeTrip.id);
+      setActiveTrip(null);
+      setDirections(null);
+      alert("Mission Canceled.");
+    } catch (err) {
+      alert("Cancellation failed.");
+    }
+  };
 
-  try {
-    setUploadError('');
-    const formData = new FormData();
-    formData.append('make_model', vehicleForm.make_model);
-    formData.append('plate_number', vehicleForm.plate_number);
-    
-    // Only append if files actually exist
-    if (vehiclePhoto) formData.append('photo', vehiclePhoto);
-    if (driverFacePhoto) formData.append('driver_photo', driverFacePhoto);
-    
-    await vehicleAPI.registerVehicle(formData);
-    
-    setHasVehicle(true); 
-    setShowVehicleForm(false);
-    setVehicleForm({ make_model: '', plate_number: '' });
-    setVehiclePhoto(null);
-    setDriverFacePhoto(null);
-    alert('Vehicle Registry and Biometrics Secured.');
-    window.location.reload(); // Refresh to update UI state
-  } catch (err) { 
-    console.error("Upload error:", err);
-    // Handle the specific cases where the server rejects large files
-    const errorMessage = err.response?.data?.detail || 
-                        (err.response?.status === 413 ? "File is too large for the server (Max 5MB)." : "Registry sync failed. Please check connection.");
-    setUploadError(errorMessage); 
-  }
-};
+  const submitVehicle = async () => {
+    if (!vehicleForm.make_model || !vehicleForm.plate_number) {
+      return alert("Please fill in vehicle details.");
+    }
+    if (!driverFacePhoto && !hasVehicle) {
+      return alert("Please upload your facial image for biometric verification.");
+    }
+
+    try {
+      setUploadError('');
+      const formData = new FormData();
+      formData.append('make_model', vehicleForm.make_model);
+      formData.append('plate_number', vehicleForm.plate_number);
+      if (vehiclePhoto) formData.append('photo', vehiclePhoto);
+      if (driverFacePhoto) formData.append('driver_photo', driverFacePhoto);
+      
+      await vehicleAPI.registerVehicle(formData);
+      
+      setHasVehicle(true); 
+      setShowVehicleForm(false);
+      setVehicleForm({ make_model: '', plate_number: '' });
+      setVehiclePhoto(null);
+      setDriverFacePhoto(null);
+      alert('Vehicle Registry and Biometrics Secured.');
+      window.location.reload();
+    } catch (err) { 
+      const errorMessage = err.response?.data?.detail || 
+                          (err.response?.status === 413 ? "File is too large for the server (Max 5MB)." : "Registry sync failed.");
+      setUploadError(errorMessage); 
+    }
+  };
 
   if (loadError) return <div className="p-10 text-red-500 font-bold text-center">Map Failure</div>;
   if (!isLoaded) return <div className="h-full w-full bg-white flex items-center justify-center text-black font-black text-xs uppercase animate-pulse">Initializing...</div>;
@@ -183,10 +193,10 @@ const DriverOverview = () => {
       <div className="absolute inset-0 z-0">
         <GoogleMap center={currentPos} zoom={14} mapContainerStyle={{ width: '100%', height: '100%' }} options={{ disableDefaultUI: true }}>
           <MarkerF position={currentPos} />
+          {directions && <DirectionsRenderer directions={directions} options={{ polylineOptions: { strokeColor: '#008751', strokeWeight: 5 } }} />}
         </GoogleMap>
       </div>
 
-      {/* TOP OVERLAY */}
       <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
             <button onClick={handleToggleOnline} className={`px-8 py-3.5 rounded-2xl font-black text-[10px] tracking-[0.2em] transition-all duration-300 shadow-2xl ${isOnline ? 'bg-[#008751] text-white shadow-[0_0_30px_rgba(0,135,81,0.3)]' : 'bg-white border border-gray-100 text-gray-500'}`}>
@@ -212,8 +222,7 @@ const DriverOverview = () => {
         </div>
       </div>
 
-      {/* ACTIVE MISSION CARD */}
-      {activeTrip && activeTrip.status !== 'Canceled' && (
+      {activeTrip && activeTrip.status === 'Active' && (
         <div className="absolute top-24 left-6 z-10 animate-in slide-in-from-left-4 duration-500">
            <div className="bg-white border-l-4 border-[#008751] p-6 rounded-[2rem] shadow-2xl flex items-center justify-between gap-10 min-w-[380px] border border-gray-100">
                 <div className="flex items-center gap-4">
@@ -228,7 +237,6 @@ const DriverOverview = () => {
         </div>
       )}
 
-      {/* RIDE REQUESTS SIDEBAR */}
       <div className="absolute bottom-8 left-8 right-8 lg:left-auto lg:right-10 lg:w-[450px] z-10">
         <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
           <div className="flex items-center justify-between mb-8 px-2">
@@ -244,6 +252,12 @@ const DriverOverview = () => {
           ) : !isOnline ? (
             <div className="py-12 text-center border-2 border-dashed border-gray-100 rounded-[2.5rem] px-6">
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] text-center">Connect to Network to start receiving passenger missions</p>
+            </div>
+          ) : activeTrip ? (
+            <div className="py-12 text-center bg-green-50 rounded-[2.5rem] px-6">
+               <ShieldCheck size={40} className="mx-auto text-[#008751] mb-4" />
+               <p className="text-[#008751] text-[10px] font-black uppercase tracking-widest">Active Mission in Progress</p>
+               <p className="text-gray-500 text-[9px] mt-2 font-bold uppercase">Follow the GPS coordinates to the destination.</p>
             </div>
           ) : rideRequests.length === 0 ? (
             <div className="py-16 text-center text-gray-400 text-[10px] font-black uppercase tracking-[0.2em]">Searching...</div>
@@ -266,7 +280,6 @@ const DriverOverview = () => {
         </div>
       </div>
 
-      {/* VEHICLE MODAL */}
       {showVehicleForm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 z-50">
           <div className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-in zoom-in duration-300 text-black">
@@ -281,16 +294,12 @@ const DriverOverview = () => {
               <input className="w-full bg-gray-100 p-4 rounded-2xl text-black border border-gray-100 outline-none focus:border-green-500 font-bold text-sm" placeholder="License Plate Number"
                 value={vehicleForm.plate_number} onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })} />
 
-              {/* GRID FOR DUAL UPLOADS */}
               <div className="grid grid-cols-2 gap-4">
-                {/* 1. Vehicle Photo */}
                 <label className="border-2 border-dashed border-gray-100 bg-gray-50 p-6 rounded-3xl text-center group cursor-pointer hover:border-[#008751] transition-all block">
                     <Camera className="mx-auto mb-2 text-gray-300" size={24} />
                     <p className="text-[8px] text-gray-500 font-black uppercase tracking-widest">{vehiclePhoto ? 'Car Photo OK' : 'Upload Car'}</p>
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => setVehiclePhoto(e.target.files?.[0] || null)} />
                 </label>
-
-                {/* 2. Driver Face Photo */}
                 <label className="border-2 border-dashed border-gray-100 bg-gray-50 p-6 rounded-3xl text-center group cursor-pointer hover:border-[#008751] transition-all block">
                     <User className="mx-auto mb-2 text-gray-300" size={24} />
                     <p className="text-[8px] text-gray-500 font-black uppercase tracking-widest">{driverFacePhoto ? 'Face Photo OK' : 'Upload Face'}</p>
