@@ -547,11 +547,20 @@ def admin_passengers(user: models.User = Depends(get_current_user), db: Session 
     return [{"id": u.id, "email": u.email, "is_verified": u.passenger.is_verified if u.passenger else False, "role": u.role, "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address, "created_at": u.created_at} for u in u_list]
 
 @app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
-def admin_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); u_list = db.query(models.User).filter(models.User.role == "Driver").all(); res = []
+def admin_get_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    u_list = db.query(models.User).filter(models.User.role == "Driver").all()
+    res = []
     for u in u_list:
         v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == u.id).first()
-        res.append({"id": u.id, "email": u.email, "is_verified": u.driver.is_verified if u.driver else False, "role": u.role, "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address, "vehicle": v, "created_at": u.created_at})
+        res.append({
+            "id": u.id, "email": u.email, "role": u.role, "full_name": u.full_name,
+            "is_verified": u.driver.is_verified if u.driver else False,
+            "id_photo_url": u.driver.id_photo_url if u.driver else None,
+            "phone": u.phone, "id_number": u.id_number, "address": u.physical_address,
+            "dob": u.dob, "gender": u.gender, "created_at": u.created_at, 
+            "vehicle": v
+        })
     return res
 
 @app.get("/admin/users", response_model=List[schemas.AdminUserOut])
