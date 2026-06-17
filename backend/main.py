@@ -454,6 +454,26 @@ def register_vehicle(
 # ADMIN & ALERTS
 # ==========================================
 
+@app.get("/admin/trips")
+def admin_get_all_trips(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    # Join with User table to get passenger emails as required by frontend
+    results = db.query(models.Trip, models.User.email).join(models.User, models.Trip.passenger_id == models.User.id).order_by(models.Trip.start_time.desc()).all()
+    
+    trips_list = []
+    for trip, email in results:
+        t_dict = {
+            "id": trip.id,
+            "passenger_email": email,
+            "pickup_location": trip.pickup_location,
+            "destination": trip.destination,
+            "fare": trip.fare,
+            "status": trip.status,
+            "start_time": trip.start_time
+        }
+        trips_list.append(t_dict)
+    return trips_list
+
 @app.get("/admin/alerts", response_model=List[schemas.AdminAlertOut])
 def get_admin_alerts(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user)
