@@ -22,6 +22,11 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "secureride_v3_final_terminal")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
+# File upload configuration
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB in bytes
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/jpg"}
+ALLOWED_DOCUMENT_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/jpg"}
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -52,6 +57,58 @@ def validate_password_strength(password: str):
         raise HTTPException(400, "Password must contain at least 1 special character")
     if len(re.findall(r"\d", password)) < 3:
         raise HTTPException(400, "Password must contain at least 3 digits")
+
+def validate_file_size(file: UploadFile, max_size: int = MAX_FILE_SIZE):
+    """Validate file size before processing"""
+    if file.size and file.size > max_size:
+        size_mb = max_size / (1024 * 1024)
+        raise HTTPException(
+            status_code=413, 
+            detail=f"File too large. Maximum size: {size_mb}MB"
+        )
+
+def validate_image_type(file: UploadFile):
+    """Validate image file type"""
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Invalid image type. Allowed: JPEG, PNG"
+        )
+
+def validate_document_type(file: UploadFile):
+    """Validate document file type (for ID uploads)"""
+    if file.content_type not in ALLOWED_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Invalid document type. Allowed: PDF, JPEG, PNG"
+        )
+
+def safe_file_to_base64(file: UploadFile, max_size: int = MAX_FILE_SIZE) -> str:
+    """Safely read file and convert to base64 with validation"""
+    try:
+        # Validate size
+        validate_file_size(file, max_size)
+        
+        # Read file content
+        file_content = file.file.read()
+        
+        # Double-check file size after reading
+        if len(file_content) > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large after reading"
+            )
+        
+        # Convert to base64
+        b64_content = base64.b64encode(file_content).decode('utf-8')
+        return b64_content
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"File processing failed: {str(e)}"
+        )
 
 def get_password_hash(p): return pwd_context.hash(hashlib.sha256(p.encode()).hexdigest())
 def verify_password(p, h): return pwd_context.verify(hashlib.sha256(p.encode()).hexdigest(), h)
@@ -165,7 +222,13 @@ def update_profile(data: schemas.ProfileUpdate, user: models.User = Depends(get_
 
 @app.post("/auth/upload-id/{user_id}")
 def upload_id(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    content = f"data:{file.content_type};base64,{base64.b64encode(file.file.read()).decode('utf-8')}"
+    # Validate file type (documents can be PDF or images)
+    validate_document_type(file)
+    
+    # Safely convert to base64
+    b64_content = safe_file_to_base64(file, MAX_FILE_SIZE)
+    content = f"data:{file.content_type};base64,{b64_content}"
+    
     p = db.query(models.Passenger).filter(models.Passenger.user_id == user_id).first()
     d = db.query(models.Driver).filter(models.Driver.user_id == user_id).first()
     if p: p.id_photo_url = content
@@ -186,7 +249,7 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/trips/book", response_model=schemas.TripOut)
 def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    trip = models.Trip(passenger_id=user.id, pickup_location=data.pickup_location, destination=data.destination, distance_km=data.distance_km, duration_minutes=data.duration_minutes, fare=data.fare, status="Searching")
+    trip = models.Trip(passenger_id=user.id, pickup_location=data.pickup_location, destination=data.destination, distance_km=data.distance_km, duration_minutes=data.duration_minutes, fare=data.fare)
     db.add(trip); db.commit(); db.refresh(trip); return trip
 
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
@@ -301,10 +364,20 @@ def register_vehicle(
 ):
     if user.role != "Driver": raise HTTPException(403)
     
-    veh_uri = f"data:{photo.content_type};base64,{base64.b64encode(photo.file.read()).decode('utf-8')}" if photo else None
+    veh_uri = None
+    if photo:
+        # Validate photo type
+        validate_image_type(photo)
+        # Safely convert to base64
+        b64_content = safe_file_to_base64(photo, MAX_FILE_SIZE)
+        veh_uri = f"data:{photo.content_type};base64,{b64_content}"
     
     if driver_photo:
-        user.driver.id_photo_url = f"data:{driver_photo.content_type};base64,{base64.b64encode(driver_photo.file.read()).decode('utf-8')}"
+        # Validate driver photo type
+        validate_image_type(driver_photo)
+        # Safely convert to base64
+        b64_content = safe_file_to_base64(driver_photo, MAX_FILE_SIZE)
+        user.driver.id_photo_url = f"data:{driver_photo.content_type};base64,{b64_content}"
 
     v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
     if v:
@@ -362,14 +435,14 @@ def admin_overview(user: models.User = Depends(get_current_user), db: Session = 
 @app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
 def admin_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user); u_list = db.query(models.User).filter(models.User.role == "Passenger").all()
-    return [{"id": u.id, "email": u.email, "is_verified": u.passenger.is_verified if u.passenger else False, "role": u.role, "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address, "dob": u.dob, "gender": u.gender, "ethnicity": u.ethnicity, "id_photo_url": u.passenger.id_photo_url if u.passenger else None, "created_at": u.created_at} for u in u_list]
+    return [{"id": u.id, "email": u.email, "is_verified": u.passenger.is_verified if u.passenger else False, "role": u.role, "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address, "created_at": u.created_at} for u in u_list]
 
 @app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
 def admin_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user); u_list = db.query(models.User).filter(models.User.role == "Driver").all(); res = []
     for u in u_list:
         v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == u.id).first()
-        res.append({"id": u.id, "email": u.email, "is_verified": u.driver.is_verified if u.driver else False, "role": u.role, "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address, "dob": u.dob, "gender": u.gender, "ethnicity": u.ethnicity, "id_photo_url": u.driver.id_photo_url if u.driver else None, "vehicle": v, "created_at": u.created_at})
+        res.append({"id": u.id, "email": u.email, "is_verified": u.driver.is_verified if u.driver else False, "role": u.role, "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address, "vehicle": v, "created_at": u.created_at})
     return res
 
 @app.get("/admin/users", response_model=List[schemas.AdminUserOut])
