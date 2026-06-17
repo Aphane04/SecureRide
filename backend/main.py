@@ -368,42 +368,57 @@ def register_vehicle(
     db: Session = Depends(get_db)
 ):
     if user.role != "Driver": 
-        raise HTTPException(status_code=403, detail="Only drivers can register vehicles")
+        raise HTTPException(status_code=403, detail="Unauthorized: Only drivers can register vehicles.")
     
-    # Process Vehicle Photo
-    veh_uri = None
-    if photo and photo.filename:
-        validate_image_type(photo)
-        b64_content = safe_file_to_base64(photo, MAX_FILE_SIZE)
-        veh_uri = f"data:{photo.content_type};base64,{b64_content}"
-    
-    # Process Driver Face Photo
+    # 1. CRITICAL FIX: Ensure the driver record exists
+    # We need the actual Driver record, not just the User record
+    driver_record = db.query(models.Driver).filter(models.Driver.user_id == user.id).first()
+    if not driver_record:
+        # If for some reason the driver record is missing, create it now
+        driver_record = models.Driver(user_id=user.id)
+        db.add(driver_record)
+        db.flush() # This gets us an ID without committing yet
+
+    # 2. Handle Driver Face Photo (Biometrics)
     if driver_photo and driver_photo.filename:
         validate_image_type(driver_photo)
         b64_face = safe_file_to_base64(driver_photo, MAX_FILE_SIZE)
-        if user.driver:
-            user.driver.id_photo_url = f"data:{driver_photo.content_type};base64,{b64_face}"
-        else:
-            # Fallback if driver record missing
-            new_driver = models.Driver(user_id=user.id, id_photo_url=f"data:{driver_photo.content_type};base64,{b64_face}")
-            db.add(new_driver)
+        driver_record.id_photo_url = f"data:{driver_photo.content_type};base64,{b64_face}"
 
+    # 3. Handle Vehicle Photo
+    veh_uri = None
+    if photo and photo.filename:
+        validate_image_type(photo)
+        b64_veh = safe_file_to_base64(photo, MAX_FILE_SIZE)
+        veh_uri = f"data:{photo.content_type};base64,{b64_veh}"
+
+    # 4. Save or Update Vehicle
+    # Use driver_record.user_id to match your table's driver_id column
     v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
-    if v:
-        v.make_model, v.plate_number = make_model, plate_number
-        if veh_uri: v.photo_url = veh_uri
-    else:
-        v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=veh_uri)
-        db.add(v)
     
     try:
+        if v:
+            v.make_model = make_model
+            v.plate_number = plate_number
+            if veh_uri: 
+                v.photo_url = veh_uri
+        else:
+            v = models.Vehicle(
+                driver_id=user.id, 
+                make_model=make_model, 
+                plate_number=plate_number, 
+                photo_url=veh_uri
+            )
+            db.add(v)
+        
         db.commit()
         db.refresh(v)
         return v
+
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Database sync failed")
-
+        print(f"DATABASE ERROR: {str(e)}") # This will show the actual error in your terminal
+        raise HTTPException(status_code=500, detail=f"Database sync failed: {str(e)}")
 # ==========================================
 # ADMIN & ALERTS
 # ==========================================
