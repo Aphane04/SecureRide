@@ -254,17 +254,39 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/trips/book", response_model=schemas.TripOut)
 def book_trip(data: schemas.TripCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    trip = models.Trip(passenger_id=user.id, pickup_location=data.pickup_location, destination=data.destination, distance_km=data.distance_km, duration_minutes=data.duration_minutes, fare=data.fare)
-    db.add(trip); db.commit(); db.refresh(trip); return trip
+    # FIX: Fare Calculation (Base rate 15 + 12 per KM)
+    calculated_fare = 15.0 + (data.distance_km * 12.0)
+    
+    trip = models.Trip(
+        passenger_id=user.id, 
+        pickup_location=data.pickup_location, 
+        destination=data.destination, 
+        distance_km=data.distance_km, 
+        duration_minutes=data.duration_minutes, 
+        fare=round(calculated_fare, 2), # Use calculated fare
+        status="Searching"
+    )
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    return trip
 
 @app.get("/trips/requests", response_model=List[schemas.TripOut])
 def get_requests(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role != "Driver": raise HTTPException(403)
+    # Check if driver is verified and has vehicle
+    driver = db.query(models.Driver).filter(models.Driver.user_id == user.id).first()
     veh = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
-    if not veh: raise HTTPException(403, "Please register your vehicle first.")
     
-    limit = datetime.utcnow() - timedelta(minutes=15)
-    return db.query(models.Trip).filter(models.Trip.status == "Searching", models.Trip.driver_id == None, models.Trip.start_time >= limit).all()
+    if not veh or not driver or not driver.is_verified:
+        raise HTTPException(403, "Verification and Vehicle registration required.")
+    
+    limit = datetime.utcnow() - timedelta(minutes=30)
+    return db.query(models.Trip).filter(
+        models.Trip.status == "Searching", 
+        models.Trip.driver_id == None, 
+        models.Trip.created_at >= limit
+    ).all()
 
 @app.post("/trips/{trip_id}/accept", response_model=schemas.TripOut)
 def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -280,20 +302,20 @@ def accept_trip(trip_id: int, user: models.User = Depends(get_current_user), db:
 def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     trip = db.query(models.Trip).filter(
         or_(models.Trip.passenger_id == user.id, models.Trip.driver_id == user.id),
-        models.Trip.status.in_(["Active", "Searching", "Canceled", "Completed"])
+        models.Trip.status.in_(["Active", "Searching"])
     ).order_by(models.Trip.start_time.desc()).first()
 
-    if not trip: raise HTTPException(404)
+    if not trip: 
+        raise HTTPException(404, detail="No active trip found")
 
-    if trip.status == "Active" and trip.driver_id:
+    if trip.driver_id:
         d = db.query(models.User).filter(models.User.id == trip.driver_id).first()
         v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
-        
-        trip.driver_name = d.full_name
-        trip.driver_photo_url = d.driver.id_photo_url if (d and d.driver) else None
-        
+        if d: trip.driver_name = d.full_name
         if v: 
-            trip.vehicle_model, trip.vehicle_plate = v.make_model, v.plate_number
+            trip.vehicle_model = v.make_model
+            trip.vehicle_plate = v.plate_number
+            
     return trip
 
 @app.get("/trips/history", response_model=List[schemas.TripOut])

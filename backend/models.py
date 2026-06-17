@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, T
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+from sqlalchemy.dialects.mysql import LONGTEXT
 
 class User(Base):
     __tablename__ = "user"
@@ -39,7 +40,7 @@ class Driver(Base):
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     license_number = Column(String(100))
     verification_status = Column(String(50), default="Pending")
-    id_photo_url = Column(Text, nullable=True)
+    id_photo_url = Column(LONGTEXT, nullable=True)
     is_verified = Column(Boolean, default=False)
     user = relationship("User", back_populates="driver")
     vehicles = relationship("Vehicle", back_populates="driver", cascade="all, delete-orphan")
