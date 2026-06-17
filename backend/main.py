@@ -542,9 +542,19 @@ def get_admin_notifications(user: models.User = Depends(get_current_user), db: S
     return notifications[:15]
 
 @app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
-def admin_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin(user); u_list = db.query(models.User).filter(models.User.role == "Passenger").all()
-    return [{"id": u.id, "email": u.email, "is_verified": u.passenger.is_verified if u.passenger else False, "role": u.role, "full_name": u.full_name, "phone": u.phone, "id_number": u.id_number, "address": u.physical_address, "created_at": u.created_at} for u in u_list]
+def admin_get_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    u_list = db.query(models.User).filter(models.User.role == "Passenger").all()
+    res = []
+    for u in u_list:
+        res.append({
+            "id": u.id, "email": u.email, "role": u.role, "full_name": u.full_name,
+            "is_verified": u.passenger.is_verified if u.passenger else False,
+            "id_photo_url": u.passenger.id_photo_url if u.passenger else None,
+            "phone": u.phone, "id_number": u.id_number, "address": u.physical_address,
+            "dob": u.dob, "gender": u.gender, "created_at": u.created_at
+        })
+    return res
 
 @app.get("/admin/drivers", response_model=List[schemas.AdminUserOut])
 def admin_get_drivers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
