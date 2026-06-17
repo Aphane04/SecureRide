@@ -254,13 +254,13 @@ def verify_liveness(user_id: int, db: Session = Depends(get_db)):
 
 # 1. FIXED: Added estimate route that returns 'estimated_fare' for the frontend
 @app.post("/trips/estimate")
-def estimate_fare(data: schemas.TripCreate):
+def estimate_fare(data: dict):
     # Logic: R15.00 base + R12.00 per kilometer
-    distance = data.distance_km if data.distance_km else 0
-    calculated_fare = 15.0 + (distance * 12.0)
+    distance = data.get("distance_km", 0)
+    calculated_fare = 15.0 + (float(distance) * 12.0)
     return {"estimated_fare": round(calculated_fare, 2)}
 
-# 2. FIXED: Active trip polling - Moved ABOVE {trip_id} and returns null on empty
+# 2. FIXED: Active trip polling - Positioned correctly and handles empty states
 @app.get("/trips/active", response_model=Optional[schemas.TripOut])
 def get_active(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     trip = db.query(models.Trip).filter(
@@ -269,19 +269,17 @@ def get_active(user: models.User = Depends(get_current_user), db: Session = Depe
     ).order_by(models.Trip.start_time.desc()).first()
 
     if not trip: 
-        return None # Prevents 404 console errors during frontend polling
+        raise HTTPException(status_code=404, detail="No active trip")
 
     if trip.driver_id:
         d = db.query(models.User).filter(models.User.id == trip.driver_id).first()
         v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == trip.driver_id).first()
         if d: 
             trip.driver_name = d.full_name
-            # Pull photo from driver profile
             d_profile = db.query(models.Driver).filter(models.Driver.user_id == d.id).first()
             trip.driver_photo_url = d_profile.id_photo_url if d_profile else None
         if v: 
-            trip.vehicle_model = v.make_model
-            trip.vehicle_plate = v.plate_number
+            trip.vehicle_model, trip.vehicle_plate = v.make_model, v.plate_number
             
     return trip
 
