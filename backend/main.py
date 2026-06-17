@@ -512,6 +512,35 @@ def admin_overview(user: models.User = Depends(get_current_user), db: Session = 
         "safety_alerts": db.query(models.AiSafetyLog).count()
     }
 
+@app.get("/admin/notifications")
+def get_admin_notifications(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin(user)
+    notifications = []
+    
+    # 1. Get Safety Alerts (Top 10)
+    alerts = db.query(models.AiSafetyLog).order_by(models.AiSafetyLog.detected_at.desc()).limit(10).all()
+    for a in alerts:
+        notifications.append({
+            "id": f"alert_{a.id}",
+            "type": "SAFETY_ALERT",
+            "message": f"AI Hazard Detected: {a.transcript[:40]}...",
+            "time": a.detected_at
+        })
+    
+    # 2. Get Recent Registrations (Top 10)
+    new_users = db.query(models.User).order_by(models.User.created_at.desc()).limit(10).all()
+    for u in new_users:
+        notifications.append({
+            "id": f"reg_{u.id}",
+            "type": "REGISTRATION",
+            "message": f"New {u.role} joined: {u.email}",
+            "time": u.created_at
+        })
+    
+    # Sort combined list by time descending
+    notifications.sort(key=lambda x: x["time"], reverse=True)
+    return notifications[:15]
+
 @app.get("/admin/passengers", response_model=List[schemas.AdminUserOut])
 def admin_passengers(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_admin(user); u_list = db.query(models.User).filter(models.User.role == "Passenger").all()
