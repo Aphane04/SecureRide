@@ -85,19 +85,23 @@ def validate_document_type(file: UploadFile):
 
 def safe_file_to_base64(file: UploadFile, max_size: int = MAX_FILE_SIZE) -> str:
     """Safely read file and convert to base64 with robust validation"""
+    if not file:
+        return None
     try:
-        # Read file content safely
+        # Reset file pointer to start to ensure we read from the beginning
+        file.file.seek(0)
         file_content = file.file.read()
         
         # Validate size based on actual bytes read
-        if len(file_content) > max_size:
+        actual_size = len(file_content)
+        if actual_size > max_size:
             size_mb = max_size / (1024 * 1024)
             raise HTTPException(
                 status_code=413, 
-                detail=f"File too large. Maximum size: {size_mb}MB"
+                detail=f"File too large ({round(actual_size/(1024*1024), 2)}MB). Maximum: {size_mb}MB"
             )
             
-        if len(file_content) == 0:
+        if actual_size == 0:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
         
         # Convert to base64
@@ -358,27 +362,31 @@ def del_contact(cid: int, user: models.User = Depends(get_current_user), db: Ses
 def register_vehicle(
     make_model: str = Form(...), 
     plate_number: str = Form(...), 
-    photo: UploadFile = File(None), # Vehicle Photo
-    driver_photo: UploadFile = File(None), # Driver Face Photo
+    photo: UploadFile = File(None), 
+    driver_photo: UploadFile = File(None), 
     user: models.User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    if user.role != "Driver": raise HTTPException(403)
+    if user.role != "Driver": 
+        raise HTTPException(status_code=403, detail="Only drivers can register vehicles")
     
+    # Process Vehicle Photo
     veh_uri = None
-    if photo:
-        # Validate photo type
+    if photo and photo.filename:
         validate_image_type(photo)
-        # Safely convert to base64
         b64_content = safe_file_to_base64(photo, MAX_FILE_SIZE)
         veh_uri = f"data:{photo.content_type};base64,{b64_content}"
     
-    if driver_photo:
-        # Validate driver photo type
+    # Process Driver Face Photo
+    if driver_photo and driver_photo.filename:
         validate_image_type(driver_photo)
-        # Safely convert to base64
-        b64_content = safe_file_to_base64(driver_photo, MAX_FILE_SIZE)
-        user.driver.id_photo_url = f"data:{driver_photo.content_type};base64,{b64_content}"
+        b64_face = safe_file_to_base64(driver_photo, MAX_FILE_SIZE)
+        if user.driver:
+            user.driver.id_photo_url = f"data:{driver_photo.content_type};base64,{b64_face}"
+        else:
+            # Fallback if driver record missing
+            new_driver = models.Driver(user_id=user.id, id_photo_url=f"data:{driver_photo.content_type};base64,{b64_face}")
+            db.add(new_driver)
 
     v = db.query(models.Vehicle).filter(models.Vehicle.driver_id == user.id).first()
     if v:
@@ -388,8 +396,13 @@ def register_vehicle(
         v = models.Vehicle(driver_id=user.id, make_model=make_model, plate_number=plate_number, photo_url=veh_uri)
         db.add(v)
     
-    db.commit(); db.refresh(v)
-    return v
+    try:
+        db.commit()
+        db.refresh(v)
+        return v
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database sync failed")
 
 # ==========================================
 # ADMIN & ALERTS

@@ -139,13 +139,21 @@ const DriverOverview = () => {
     } catch (err) { alert("Finalization failed."); }
   };
 
-  const submitVehicle = async () => {
-  if (!driverFacePhoto) return alert("Please upload your facial image for biometric verification.");
+ const submitVehicle = async () => {
+  if (!vehicleForm.make_model || !vehicleForm.plate_number) {
+    return alert("Please fill in vehicle details.");
+  }
+  if (!driverFacePhoto && !hasVehicle) {
+    return alert("Please upload your facial image for biometric verification.");
+  }
+
   try {
-    setUploadError(''); // Clear previous errors
+    setUploadError('');
     const formData = new FormData();
     formData.append('make_model', vehicleForm.make_model);
     formData.append('plate_number', vehicleForm.plate_number);
+    
+    // Only append if files actually exist
     if (vehiclePhoto) formData.append('photo', vehiclePhoto);
     if (driverFacePhoto) formData.append('driver_photo', driverFacePhoto);
     
@@ -156,11 +164,14 @@ const DriverOverview = () => {
     setVehicleForm({ make_model: '', plate_number: '' });
     setVehiclePhoto(null);
     setDriverFacePhoto(null);
-    alert('Vehicle Data and Biometrics Secured.');
+    alert('Vehicle Registry and Biometrics Secured.');
+    window.location.reload(); // Refresh to update UI state
   } catch (err) { 
-    // Extract the actual backend error message if available
-    const backendError = err.response?.data?.detail || err.message || 'Registry sync failed.';
-    setUploadError(typeof backendError === 'string' ? backendError : JSON.stringify(backendError)); 
+    console.error("Upload error:", err);
+    // Handle the specific cases where the server rejects large files
+    const errorMessage = err.response?.data?.detail || 
+                        (err.response?.status === 413 ? "File is too large for the server (Max 5MB)." : "Registry sync failed. Please check connection.");
+    setUploadError(errorMessage); 
   }
 };
 
