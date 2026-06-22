@@ -108,9 +108,9 @@ const AdminOverview = () => {
                     <StatusBadge status={t.status} />
                   </td>
                   <td className="p-6 text-center">
-                    <button className="p-2.5 bg-gray-100 rounded-xl hover:bg-black hover:text-white transition-all text-gray-400">
+                    {/*<button className="p-2.5 bg-gray-100 rounded-xl hover:bg-black hover:text-white transition-all text-gray-400">
                         <MoreHorizontal size={18}/>
-                    </button>
+                    </button>*/}
                   </td>
                 </tr>
               )) : (
