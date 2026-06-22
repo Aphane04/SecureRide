@@ -98,7 +98,7 @@ const DriverHistory = () => {
                   <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Earnings</th>
                   <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Status</th>
                   <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Completed At</th>
-                  <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Action</th>
+                 {/*} <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Action</th>*/}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -148,9 +148,9 @@ const DriverHistory = () => {
                     </td>
 
                     <td className="p-6 text-center">
-                        <button className="p-2.5 rounded-xl bg-gray-100 text-gray-400 group-hover:bg-black group-hover:text-white transition-all shadow-sm">
+                       {/*} <button className="p-2.5 rounded-xl bg-gray-100 text-gray-400 group-hover:bg-black group-hover:text-white transition-all shadow-sm">
                             <ArrowUpRight size={16} />
-                        </button>
+                        </button>*/}
                     </td>
                   </tr>
                 ))}

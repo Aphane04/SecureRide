@@ -120,7 +120,7 @@ const handleSubmit = async (e) => {
             <div className={inputContainer}>
               <div className="flex justify-between items-center">
                 <label className={labelClass}>Access Password</label>
-                <span className="text-[9px] text-gray-400 font-bold uppercase hover:text-[#008751] cursor-pointer transition-colors tracking-widest">Forgot?</span>
+                {/*<span className="text-[9px] text-gray-400 font-bold uppercase hover:text-[#008751] cursor-pointer transition-colors tracking-widest">Forgot?</span>*/}
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-4 text-gray-400" size={18} />
