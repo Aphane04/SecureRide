@@ -71,7 +71,7 @@ const AdminOverview = () => {
                 <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Mission Route</th>
                 <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Fare</th>
                 <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Protocol</th>
+                {/*<th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Protocol</th>*/}
               </tr>
             </thead>
             <tbody className="text-black">

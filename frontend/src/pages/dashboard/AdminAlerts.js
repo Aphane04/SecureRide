@@ -215,9 +215,9 @@ END OF REPORT
                     <Download size={20} /> Download Report File (.txt)
                 </button>
                 
-                <button className="bg-red-700 text-white px-10 py-5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-800 flex items-center gap-3">
+               {/* <button className="bg-red-700 text-white px-10 py-5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-800 flex items-center gap-3">
                     <ShieldAlert size={20} /> Dispatch SAPS
-                </button>
+                </button>*/}
             </div>
           </div>
         </div>
